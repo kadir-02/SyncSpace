@@ -4,6 +4,8 @@ import helmet from "helmet";
 import authRoutes from "./routes/auth.routes.js";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
 import workspaceRoutes from "./routes/workspace.routes.js";
+import teamRoutes from "./routes/team.routes.js";
+import teamsRoutes from "./routes/teams.routes.js";
 
 const app = express();
 
@@ -21,6 +23,8 @@ app.get("/api/v1/health", (_req, res) => {
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/workspaces", workspaceRoutes);
+app.use("/api/v1/workspaces", teamRoutes);
+app.use("/api/v1/teams", teamsRoutes);
 
 app.use(errorMiddleware);
 
