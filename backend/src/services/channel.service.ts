@@ -192,10 +192,18 @@ export const updateChannel = async (
 
   if (data.type !== undefined && data.type !== channel.type) {
     if (data.type === "private") {
-      // When converting to private, explicitly add the creator.
+      // Make the creator an explicit member of the private channel.
       await ChannelMember.updateOne(
-        { channel: channel._id, user: channel.createdBy },
-        { $setOnInsert: { channel: channel._id, user: channel.createdBy } },
+        {
+          channel: channel._id,
+          user: channel.createdBy,
+        },
+        {
+          $setOnInsert: {
+            channel: channel._id,
+            user: channel.createdBy,
+          },
+        },
         { upsert: true },
       );
     }
@@ -240,4 +248,197 @@ export const deleteChannel = async (channelId: string, userId: string) => {
   await channel.deleteOne();
 
   return { id: channel._id };
+};
+
+export const addChannelMember = async (
+  channelId: string,
+  currentUserId: string,
+  targetUserId: string,
+) => {
+  const channel = await Channel.findById(channelId);
+
+  if (!channel) {
+    throw new AppError("Channel not found", 404);
+  }
+
+  if (channel.type !== "private") {
+    throw new AppError("Members are managed only for private channels", 400);
+  }
+
+  const team = await Team.findById(channel.team);
+
+  if (!team) {
+    throw new AppError("Team not found", 404);
+  }
+
+  const currentMembership = await TeamMember.findOne({
+    team: team._id,
+    user: currentUserId,
+  });
+
+  if (!currentMembership) {
+    throw new AppError("You are not a member of this team", 403);
+  }
+
+  const targetMembership = await TeamMember.findOne({
+    team: team._id,
+    user: targetUserId,
+  });
+
+  if (!targetMembership) {
+    throw new AppError("Target user is not a member of this team", 400);
+  }
+
+  const workspaceMembership = await WorkspaceMember.findOne({
+    workspace: team.workspace,
+    user: currentUserId,
+  });
+
+  const isWorkspaceAdmin =
+    workspaceMembership &&
+    ["owner", "admin"].includes(workspaceMembership.role);
+
+  const isChannelCreator = channel.createdBy.toString() === currentUserId;
+
+  if (!isWorkspaceAdmin && !isChannelCreator) {
+    throw new AppError(
+      "Only the channel creator or workspace admins can add members",
+      403,
+    );
+  }
+
+  const existingMembership = await ChannelMember.findOne({
+    channel: channelId,
+    user: targetUserId,
+  });
+
+  if (existingMembership) {
+    throw new AppError("User is already a channel member", 409);
+  }
+
+  const member = await ChannelMember.create({
+    channel: channelId,
+    user: targetUserId,
+  });
+
+  return {
+    id: member._id,
+    channel: member.channel,
+    user: member.user,
+    joinedAt: member.joinedAt,
+  };
+};
+
+export const getChannelMembers = async (channelId: string, userId: string) => {
+  const channel = await Channel.findById(channelId);
+
+  if (!channel) {
+    throw new AppError("Channel not found", 404);
+  }
+
+  if (channel.type !== "private") {
+    throw new AppError(
+      "Member lists are only available for private channels",
+      400,
+    );
+  }
+
+  const currentMembership = await TeamMember.findOne({
+    team: channel.team,
+    user: userId,
+  });
+
+  if (!currentMembership) {
+    throw new AppError("You are not a member of this team", 403);
+  }
+
+  const channelMembership = await ChannelMember.findOne({
+    channel: channelId,
+    user: userId,
+  });
+
+  const team = await Team.findById(channel.team);
+
+  const workspaceMembership = team
+    ? await WorkspaceMember.findOne({
+        workspace: team.workspace,
+        user: userId,
+      })
+    : null;
+
+  const canManage =
+    workspaceMembership &&
+    ["owner", "admin"].includes(workspaceMembership.role);
+
+  if (!channelMembership && !canManage) {
+    throw new AppError("You do not have access to this private channel", 403);
+  }
+
+  return ChannelMember.find({ channel: channelId })
+    .populate("user", "name email avatar")
+    .sort({ joinedAt: 1 });
+};
+
+export const removeChannelMember = async (
+  channelId: string,
+  currentUserId: string,
+  targetUserId: string,
+) => {
+  const channel = await Channel.findById(channelId);
+
+  if (!channel) {
+    throw new AppError("Channel not found", 404);
+  }
+
+  if (channel.type !== "private") {
+    throw new AppError("Members are managed only for private channels", 400);
+  }
+
+  const team = await Team.findById(channel.team);
+
+  if (!team) {
+    throw new AppError("Team not found", 404);
+  }
+
+  const currentMembership = await TeamMember.findOne({
+    team: team._id,
+    user: currentUserId,
+  });
+
+  if (!currentMembership) {
+    throw new AppError("You are not a member of this team", 403);
+  }
+
+  const workspaceMembership = await WorkspaceMember.findOne({
+    workspace: team.workspace,
+    user: currentUserId,
+  });
+
+  const isWorkspaceAdmin =
+    workspaceMembership &&
+    ["owner", "admin"].includes(workspaceMembership.role);
+
+  const isChannelCreator = channel.createdBy.toString() === currentUserId;
+
+  if (!isWorkspaceAdmin && !isChannelCreator) {
+    throw new AppError(
+      "Only the channel creator or workspace admins can remove members",
+      403,
+    );
+  }
+
+  if (targetUserId === channel.createdBy.toString()) {
+    throw new AppError("The channel creator cannot be removed", 400);
+  }
+
+  const removed = await ChannelMember.findOneAndDelete({
+    channel: channelId,
+    user: targetUserId,
+  });
+
+  if (!removed) {
+    throw new AppError("Channel member not found", 404);
+  }
+
+  return { userId: targetUserId };
 };

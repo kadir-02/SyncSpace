@@ -15,3 +15,9 @@ export const updateChannelSchema = z.object({
 });
 
 export type UpdateChannelInput = z.infer<typeof updateChannelSchema>;
+
+export const channelMemberSchema = z.object({
+  userId: z.string().regex(/^[a-f\d]{24}$/i, "Invalid user ID"),
+});
+
+export type ChannelMemberInput = z.infer<typeof channelMemberSchema>;
