@@ -11,6 +11,7 @@ import {
 } from "../validations/message.validation.js";
 import { sendSuccess } from "../utils/api-response.js";
 import { AppError } from "../utils/app-error.js";
+import { getIO } from "../config/socket.js";
 
 export const createMessageController = async (
   req: Request<{ channelId: string }>,
@@ -23,6 +24,7 @@ export const createMessageController = async (
     req.user!.userId,
     content,
   );
+  getIO().to(`channel:${req.params.channelId}`).emit("message:new", message);
 
   return sendSuccess(res, 201, "Message sent successfully", message);
 };
@@ -68,15 +70,31 @@ export const updateMessageController = async (
     req.user!.userId,
     content,
   );
+  getIO()
+    .to(`channel:${message.channel.toString()}`)
+    .emit("message:updated", message);
 
   return sendSuccess(res, 200, "Message updated successfully", message);
 };
 
+// export const deleteMessageController = async (
+//   req: Request<{ messageId: string }>,
+//   res: Response,
+// ) => {
+//   await deleteMessage(req.params.messageId, req.user!.userId);
+
+//   return sendSuccess(res, 200, "Message deleted successfully", null);
+// };
 export const deleteMessageController = async (
   req: Request<{ messageId: string }>,
   res: Response,
 ) => {
-  await deleteMessage(req.params.messageId, req.user!.userId);
+  const result = await deleteMessage(req.params.messageId, req.user!.userId);
+
+  getIO().to(`channel:${result.channelId}`).emit("message:deleted", {
+    messageId: result.messageId,
+    channelId: result.channelId,
+  });
 
   return sendSuccess(res, 200, "Message deleted successfully", null);
 };

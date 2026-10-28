@@ -8,6 +8,8 @@ import teamRoutes from "./routes/team.routes.js";
 import teamsRoutes from "./routes/teams.routes.js";
 import channelRoutes from "./routes/channel.routes.js";
 import messageRoutes from "./routes/message.routes.js";
+import fileRoutes from "./routes/file.routes.js";
+import dmRoutes from "./routes/dm.routes.js";
 
 const app = express();
 
@@ -29,6 +31,8 @@ app.use("/api/v1/workspaces", teamRoutes);
 app.use("/api/v1/teams", teamsRoutes);
 app.use("/api/v1/channels", channelRoutes);
 app.use("/api/v1/messages", messageRoutes);
+app.use("/api/v1/files", fileRoutes);
+app.use("/api/v1/dms", dmRoutes);
 
 app.use(errorMiddleware);
 

@@ -4,6 +4,7 @@ import {
   socketAuthMiddleware,
   type AuthenticatedSocket,
 } from "../middlewares/socket-auth.middleware.js";
+import { joinChannel, leaveChannel } from "../services/socket.service.js";
 
 let io: Server;
 
@@ -28,6 +29,34 @@ export const initializeSocket = (httpServer: HttpServer) => {
 
     console.log(
       `Authenticated socket connected: ${authenticatedSocket.id}, user: ${authenticatedSocket.user.userId}`,
+    );
+
+    authenticatedSocket.on(
+      "channel:join",
+      async (data: { channelId: string }) => {
+        try {
+          await joinChannel(io, authenticatedSocket, data?.channelId);
+        } catch (error) {
+          console.error("Channel join error:", error);
+          authenticatedSocket.emit("channel:error", {
+            message: "Failed to join channel",
+          });
+        }
+      },
+    );
+
+    authenticatedSocket.on(
+      "channel:leave",
+      async (data: { channelId: string }) => {
+        try {
+          await leaveChannel(authenticatedSocket, data?.channelId);
+        } catch (error) {
+          console.error("Channel leave error:", error);
+          authenticatedSocket.emit("channel:error", {
+            message: "Failed to leave channel",
+          });
+        }
+      },
     );
 
     authenticatedSocket.on("disconnect", () => {

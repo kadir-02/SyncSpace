@@ -106,6 +106,24 @@ export const updateMessage = async (
   return message;
 };
 
+// export const deleteMessage = async (messageId: string, userId: string) => {
+//   const message = await Message.findById(messageId);
+
+//   if (!message) {
+//     throw new AppError("Message not found", 404);
+//   }
+
+//   if (message.sender.toString() !== userId) {
+//     throw new AppError("You can only delete your own messages", 403);
+//   }
+
+//   await checkChannelAccess(message.channel.toString(), userId);
+
+//   await message.deleteOne();
+
+//   return { messageId };
+// };
+
 export const deleteMessage = async (messageId: string, userId: string) => {
   const message = await Message.findById(messageId);
 
@@ -119,7 +137,12 @@ export const deleteMessage = async (messageId: string, userId: string) => {
 
   await checkChannelAccess(message.channel.toString(), userId);
 
+  const channelId = message.channel.toString();
+
   await message.deleteOne();
 
-  return { messageId };
+  return {
+    messageId,
+    channelId,
+  };
 };
