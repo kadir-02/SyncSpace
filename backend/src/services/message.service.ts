@@ -5,7 +5,7 @@ import { TeamMember } from "../models/team-member.model.js";
 import { AppError } from "../utils/app-error.js";
 import { createNotification } from "./notification.service.js";
 
-const checkChannelAccess = async (channelId: string, userId: string) => {
+export const checkChannelAccess = async (channelId: string, userId: string) => {
   const channel = await Channel.findById(channelId);
 
   if (!channel) {

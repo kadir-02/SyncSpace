@@ -10,7 +10,8 @@ import channelRoutes from "./routes/channel.routes.js";
 import messageRoutes from "./routes/message.routes.js";
 import fileRoutes from "./routes/file.routes.js";
 import dmRoutes from "./routes/dm.routes.js";
-import notificationRoutes from "./routes/notification.routes.js"
+import notificationRoutes from "./routes/notification.routes.js";
+import messageReadRoutes from "./routes/message-read.routes.js";
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use("/api/v1/messages", messageRoutes);
 app.use("/api/v1/files", fileRoutes);
 app.use("/api/v1/dms", dmRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/message-reads", messageReadRoutes);
 
 app.use(errorMiddleware);
 

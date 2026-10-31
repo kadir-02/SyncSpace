@@ -101,6 +101,67 @@ export const initializeSocket = (httpServer: HttpServer) => {
       },
     );
 
+    authenticatedSocket.on(
+      "typing:start",
+      async (data: { channelId: string }) => {
+        try {
+          await joinChannel(io, authenticatedSocket, data?.channelId);
+
+          authenticatedSocket
+            .to(`channel:${data.channelId}`)
+            .emit("typing:update", {
+              userId: authenticatedSocket.user?.userId,
+              channelId: data.channelId,
+              isTyping: true,
+            });
+        } catch (error) {
+          console.error("Typing start error:", error);
+        }
+      },
+    );
+
+    authenticatedSocket.on("typing:stop", (data: { channelId: string }) => {
+      authenticatedSocket
+        .to(`channel:${data.channelId}`)
+        .emit("typing:update", {
+          userId: authenticatedSocket.user?.userId,
+          channelId: data.channelId,
+          isTyping: false,
+        });
+    });
+
+    authenticatedSocket.on(
+      "dm:typing:start",
+      async (data: { conversationId: string }) => {
+        try {
+          await joinConversation(authenticatedSocket, data?.conversationId);
+
+          authenticatedSocket
+            .to(`dm:${data.conversationId}`)
+            .emit("dm:typing:update", {
+              userId: authenticatedSocket.user?.userId,
+              conversationId: data.conversationId,
+              isTyping: true,
+            });
+        } catch (error) {
+          console.error("DM typing start error:", error);
+        }
+      },
+    );
+
+    authenticatedSocket.on(
+      "dm:typing:stop",
+      (data: { conversationId: string }) => {
+        authenticatedSocket
+          .to(`dm:${data.conversationId}`)
+          .emit("dm:typing:update", {
+            userId: authenticatedSocket.user?.userId,
+            conversationId: data.conversationId,
+            isTyping: false,
+          });
+      },
+    );
+
     authenticatedSocket.on("disconnect", () => {
       unregisterUserSocket(io, authenticatedSocket);
       console.log(`Socket disconnected: ${authenticatedSocket.id}`);
