@@ -9,6 +9,8 @@ import {
   leaveChannel,
   joinConversation,
   leaveConversation,
+  registerUserSocket,
+  unregisterUserSocket,
 } from "../services/socket.service.js";
 
 let io: Server;
@@ -31,12 +33,12 @@ export const initializeSocket = (httpServer: HttpServer) => {
       authenticatedSocket.disconnect(true);
       return;
     }
+    registerUserSocket(io, authenticatedSocket);
     const userId = authenticatedSocket.user.userId;
 
     authenticatedSocket.join(`user:${userId}`);
 
     console.log(`User joined notification room: user:${userId}`);
-
     console.log(
       `Authenticated socket connected: ${authenticatedSocket.id}, user: ${authenticatedSocket.user.userId}`,
     );
@@ -100,6 +102,7 @@ export const initializeSocket = (httpServer: HttpServer) => {
     );
 
     authenticatedSocket.on("disconnect", () => {
+      unregisterUserSocket(io, authenticatedSocket);
       console.log(`Socket disconnected: ${authenticatedSocket.id}`);
     });
   });

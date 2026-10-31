@@ -119,3 +119,55 @@ export const leaveConversation = async (
 ) => {
   await socket.leave(`dm:${conversationId}`);
 };
+
+const onlineUsers = new Map<string, Set<string>>();
+
+export const registerUserSocket = (io: Server, socket: AuthenticatedSocket) => {
+  const userId = socket.user?.userId;
+  if (!userId) {
+    console.error("User ID is missing in the authenticated socket.");
+    return;
+  }
+  let socketIds = onlineUsers.get(userId);
+
+  const isFirstConnection = !socketIds || socketIds.size === 0;
+
+  if (!socketIds) {
+    socketIds = new Set<string>();
+    onlineUsers.set(userId, socketIds);
+  }
+
+  socketIds.add(socket.id);
+
+  // Notify others only when the user first comes online.
+  if (isFirstConnection) {
+    socket.broadcast.emit("presence:online", { userId });
+  }
+
+  // Send the current online users to this socket.
+  socket.emit("presence:online-users", {
+    userIds: Array.from(onlineUsers.keys()),
+  });
+};
+
+export const unregisterUserSocket = (
+  io: Server,
+  socket: AuthenticatedSocket,
+) => {
+  const userId = socket.user?.userId;
+  if (!userId) {
+    console.error("User ID is missing in the authenticated socket.");
+    return;
+  }
+  const socketIds = onlineUsers.get(userId);
+
+  if (!socketIds) return;
+
+  socketIds.delete(socket.id);
+
+  // Keep the user online if another tab/device is connected.
+  if (socketIds.size === 0) {
+    onlineUsers.delete(userId);
+    io.emit("presence:offline", { userId });
+  }
+};
