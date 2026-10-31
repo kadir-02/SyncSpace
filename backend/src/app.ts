@@ -12,6 +12,8 @@ import fileRoutes from "./routes/file.routes.js";
 import dmRoutes from "./routes/dm.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import messageReadRoutes from "./routes/message-read.routes.js";
+import unreadCountRoutes from "./routes/unread-count.routes.js";
+import messageSearchRoutes from "./routes/message-search.routes.js";
 
 const app = express();
 
@@ -37,6 +39,8 @@ app.use("/api/v1/files", fileRoutes);
 app.use("/api/v1/dms", dmRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/message-reads", messageReadRoutes);
+app.use("/api/v1/unread-counts", unreadCountRoutes);
+app.use("/api/v1/message-search", messageSearchRoutes);
 
 app.use(errorMiddleware);
 

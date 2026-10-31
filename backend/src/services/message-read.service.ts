@@ -3,6 +3,7 @@ import { MessageRead } from "../models/message-read.model.js";
 import { AppError } from "../utils/app-error.js";
 import { checkChannelAccess } from "./message.service.js";
 import mongoose from "mongoose";
+import { getIO } from "../config/socket.js";
 
 export const markMessagesAsRead = async (
   channelId: string,
@@ -46,8 +47,45 @@ export const markMessagesAsRead = async (
     })),
   );
 
+  getIO()
+    .to(`channel:${channelId}`)
+    .emit("message:read", {
+      channelId,
+      userId,
+      messageIds: messages.map((message) => message._id.toString()),
+      readAt,
+    });
+
   return MessageRead.find({
     message: { $in: messages.map((message) => message._id) },
     user: userObjectId,
   });
+};
+
+export const getMessageReadReceipts = async (
+  channelId: string,
+  messageIds: string[],
+  userId: string,
+) => {
+  await checkChannelAccess(channelId, userId);
+
+  const channelObjectId = new mongoose.Types.ObjectId(channelId);
+
+  const messages = await Message.find({
+    _id: { $in: messageIds },
+    channel: channelObjectId,
+  }).select("_id");
+
+  if (messages.length === 0) {
+    throw new AppError("No messages found", 404);
+  }
+
+  const validMessageIds = messages.map((message) => message._id);
+
+  return MessageRead.find({
+    channel: channelObjectId,
+    message: { $in: validMessageIds },
+  })
+    .populate("user", "name email avatar")
+    .sort({ readAt: -1 });
 };
