@@ -5,6 +5,7 @@ import {
   emitNotification,
   emitNotificationRead,
   emitNotificationDeleted,
+  emitAllNotificationsRead,
 } from "../utils/notification-emitter.js";
 
 export const getNotifications = async (
@@ -23,6 +24,7 @@ export const getNotifications = async (
   const [notifications, total, unreadCount] = await Promise.all([
     Notification.find(filter)
       .populate("sender", "name email avatar")
+      .populate("channel", "name type team")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit),
@@ -75,6 +77,10 @@ export const markAllNotificationsAsRead = async (userId: string) => {
     { $set: { isRead: true, readAt: new Date() } },
   );
 
+  if (result.modifiedCount > 0) {
+    emitAllNotificationsRead(userId);
+  }
+
   return { modifiedCount: result.modifiedCount };
 };
 
@@ -106,6 +112,7 @@ export const createNotification = async (data: {
   message: string;
   resourceId?: string;
   resourceType?: string;
+  channel?: string;
 }) => {
   const notification = await Notification.create({
     ...data,

@@ -3,6 +3,10 @@ import { Conversation } from "../models/conversation.model.js";
 import { DirectMessage } from "../models/direct-message.model.js";
 import { User } from "../models/user.model.js";
 import { AppError } from "../utils/app-error.js";
+import { getIO } from "../config/socket.js";
+import { createNotification } from "./notification.service.js";
+
+const NOTIFICATION_PREVIEW_LENGTH = 200;
 
 const checkConversationAccess = async (
   conversationId: string,
@@ -57,10 +61,19 @@ export const createConversation = async (
     createdBy: userId,
   });
 
-  return Conversation.findById(conversation._id).populate(
+  const populated = await Conversation.findById(conversation._id).populate(
     "participants",
     "name email avatar",
   );
+
+  // Let the recipient's open sessions show the new conversation immediately.
+  try {
+    getIO().to(`user:${recipientId}`).emit("dm:conversation:new", populated);
+  } catch {
+    // Socket server not initialised.
+  }
+
+  return populated;
 };
 
 export const getConversations = async (userId: string) => {
@@ -119,10 +132,35 @@ export const sendDirectMessage = async (
   conversation.lastMessage = message._id;
   await conversation.save();
 
-  return DirectMessage.findById(message._id).populate(
+  const participantIds = conversation.participants.map((id) => id.toString());
+
+  // Best-effort: DM notifications for the other participant.
+  try {
+    await Promise.allSettled(
+      participantIds
+        .filter((id) => id !== userId)
+        .map((recipient) =>
+          createNotification({
+            recipient,
+            sender: userId,
+            type: "direct_message",
+            title: "New direct message",
+            message: content.slice(0, NOTIFICATION_PREVIEW_LENGTH),
+            resourceId: conversationId,
+            resourceType: "Conversation",
+          }),
+        ),
+    );
+  } catch (error) {
+    console.error("DM notification failed:", error);
+  }
+
+  const populated = await DirectMessage.findById(message._id).populate(
     "sender",
     "name email avatar",
   );
+
+  return { message: populated, participantIds };
 };
 
 export const deleteDirectMessage = async (
@@ -139,9 +177,9 @@ export const deleteDirectMessage = async (
     throw new AppError("You can only delete your own messages", 403);
   }
 
-  await checkConversationAccess(message.conversation.toString(), userId);
-
   const conversationId = message.conversation.toString();
+
+  const conversation = await checkConversationAccess(conversationId, userId);
 
   await message.deleteOne();
 
@@ -153,5 +191,9 @@ export const deleteDirectMessage = async (
     lastMessage: latestMessage?._id ?? null,
   });
 
-  return { messageId, conversationId };
+  return {
+    messageId,
+    conversationId,
+    participantIds: conversation.participants.map((id) => id.toString()),
+  };
 };

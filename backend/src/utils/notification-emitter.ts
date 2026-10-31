@@ -21,3 +21,7 @@ export const emitNotificationDeleted = (
     notificationId,
   });
 };
+
+export const emitAllNotificationsRead = (userId: string) => {
+  getIO().to(`user:${userId}`).emit("notification:read-all", {});
+};

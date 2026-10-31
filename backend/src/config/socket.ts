@@ -15,6 +15,9 @@ import {
 
 let io: Server;
 
+const isString = (value: unknown): value is string =>
+  typeof value === "string" && value.length > 0;
+
 export const initializeSocket = (httpServer: HttpServer) => {
   io = new Server(httpServer, {
     cors: {
@@ -33,15 +36,11 @@ export const initializeSocket = (httpServer: HttpServer) => {
       authenticatedSocket.disconnect(true);
       return;
     }
-    registerUserSocket(io, authenticatedSocket);
+
     const userId = authenticatedSocket.user.userId;
 
+    // Personal room used for notifications and cross-room events.
     authenticatedSocket.join(`user:${userId}`);
-
-    console.log(`User joined notification room: user:${userId}`);
-    console.log(
-      `Authenticated socket connected: ${authenticatedSocket.id}, user: ${authenticatedSocket.user.userId}`,
-    );
 
     authenticatedSocket.on(
       "channel:join",
@@ -78,7 +77,6 @@ export const initializeSocket = (httpServer: HttpServer) => {
           await joinConversation(authenticatedSocket, data?.conversationId);
         } catch (error) {
           console.error("DM join error:", error);
-
           authenticatedSocket.emit("dm:error", {
             message: "Failed to join conversation",
           });
@@ -93,7 +91,6 @@ export const initializeSocket = (httpServer: HttpServer) => {
           await leaveConversation(authenticatedSocket, data?.conversationId);
         } catch (error) {
           console.error("DM leave error:", error);
-
           authenticatedSocket.emit("dm:error", {
             message: "Failed to leave conversation",
           });
@@ -104,16 +101,23 @@ export const initializeSocket = (httpServer: HttpServer) => {
     authenticatedSocket.on(
       "typing:start",
       async (data: { channelId: string }) => {
-        try {
-          await joinChannel(io, authenticatedSocket, data?.channelId);
+        const channelId = data?.channelId;
 
-          authenticatedSocket
-            .to(`channel:${data.channelId}`)
-            .emit("typing:update", {
-              userId: authenticatedSocket.user?.userId,
-              channelId: data.channelId,
-              isTyping: true,
-            });
+        if (!isString(channelId)) return;
+
+        try {
+          const inRoom = await joinChannel(io, authenticatedSocket, channelId, {
+            silent: true,
+          });
+
+          if (!inRoom) return;
+
+          authenticatedSocket.to(`channel:${channelId}`).emit("typing:update", {
+            userId,
+            name: authenticatedSocket.data.name,
+            channelId,
+            isTyping: true,
+          });
         } catch (error) {
           console.error("Typing start error:", error);
         }
@@ -121,26 +125,38 @@ export const initializeSocket = (httpServer: HttpServer) => {
     );
 
     authenticatedSocket.on("typing:stop", (data: { channelId: string }) => {
-      authenticatedSocket
-        .to(`channel:${data.channelId}`)
-        .emit("typing:update", {
-          userId: authenticatedSocket.user?.userId,
-          channelId: data.channelId,
-          isTyping: false,
-        });
+      const channelId = data?.channelId;
+      const room = `channel:${channelId}`;
+
+      // Only members who are actually in the room may emit to it.
+      if (!isString(channelId) || !authenticatedSocket.rooms.has(room)) return;
+
+      authenticatedSocket.to(room).emit("typing:update", {
+        userId,
+        name: authenticatedSocket.data.name,
+        channelId,
+        isTyping: false,
+      });
     });
 
     authenticatedSocket.on(
       "dm:typing:start",
       async (data: { conversationId: string }) => {
+        const conversationId = data?.conversationId;
+
+        if (!isString(conversationId)) return;
+
         try {
-          await joinConversation(authenticatedSocket, data?.conversationId);
+          if (!authenticatedSocket.rooms.has(`dm:${conversationId}`)) {
+            await joinConversation(authenticatedSocket, conversationId);
+          }
 
           authenticatedSocket
-            .to(`dm:${data.conversationId}`)
+            .to(`dm:${conversationId}`)
             .emit("dm:typing:update", {
-              userId: authenticatedSocket.user?.userId,
-              conversationId: data.conversationId,
+              userId,
+              name: authenticatedSocket.data.name,
+              conversationId,
               isTyping: true,
             });
         } catch (error) {
@@ -152,19 +168,32 @@ export const initializeSocket = (httpServer: HttpServer) => {
     authenticatedSocket.on(
       "dm:typing:stop",
       (data: { conversationId: string }) => {
-        authenticatedSocket
-          .to(`dm:${data.conversationId}`)
-          .emit("dm:typing:update", {
-            userId: authenticatedSocket.user?.userId,
-            conversationId: data.conversationId,
-            isTyping: false,
-          });
+        const conversationId = data?.conversationId;
+        const room = `dm:${conversationId}`;
+
+        if (
+          !isString(conversationId) ||
+          !authenticatedSocket.rooms.has(room)
+        ) {
+          return;
+        }
+
+        authenticatedSocket.to(room).emit("dm:typing:update", {
+          userId,
+          name: authenticatedSocket.data.name,
+          conversationId,
+          isTyping: false,
+        });
       },
     );
 
     authenticatedSocket.on("disconnect", () => {
       unregisterUserSocket(io, authenticatedSocket);
-      console.log(`Socket disconnected: ${authenticatedSocket.id}`);
+    });
+
+    // Registered last: it queries the database, so don't block the handlers above.
+    registerUserSocket(io, authenticatedSocket).catch((error) => {
+      console.error("Presence registration error:", error);
     });
   });
 

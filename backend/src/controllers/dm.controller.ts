@@ -16,6 +16,20 @@ import { sendSuccess } from "../utils/api-response.js";
 import { AppError } from "../utils/app-error.js";
 import { getIO } from "../config/socket.js";
 
+// Emit to the open conversation room and to each participant's personal room,
+// so a recipient who hasn't opened the conversation still gets the event.
+// Socket.IO delivers once per socket even if it is in several of these rooms.
+const emitToConversation = (
+  conversationId: string,
+  participantIds: string[],
+  event: string,
+  payload: unknown,
+) => {
+  getIO()
+    .to([`dm:${conversationId}`, ...participantIds.map((id) => `user:${id}`)])
+    .emit(event, payload);
+};
+
 export const createConversationController = async (
   req: Request,
   res: Response,
@@ -80,13 +94,13 @@ export const sendDirectMessageController = async (
   const { conversationId } = conversationIdSchema.parse(req.params);
   const { content } = sendDirectMessageSchema.parse(req.body);
 
-  const message = await sendDirectMessage(
+  const { message, participantIds } = await sendDirectMessage(
     conversationId,
     req.user!.userId,
     content,
   );
 
-  getIO().to(`dm:${conversationId}`).emit("dm:message:new", message);
+  emitToConversation(conversationId, participantIds, "dm:message:new", message);
 
   return sendSuccess(res, 201, "Direct message sent successfully", message);
 };
@@ -99,10 +113,15 @@ export const deleteDirectMessageController = async (
 
   const result = await deleteDirectMessage(messageId, req.user!.userId);
 
-  getIO().to(`dm:${result.conversationId}`).emit("dm:message:deleted", {
-    messageId: result.messageId,
-    conversationId: result.conversationId,
-  });
+  emitToConversation(
+    result.conversationId,
+    result.participantIds,
+    "dm:message:deleted",
+    {
+      messageId: result.messageId,
+      conversationId: result.conversationId,
+    },
+  );
 
   return sendSuccess(res, 200, "Direct message deleted successfully", null);
 };

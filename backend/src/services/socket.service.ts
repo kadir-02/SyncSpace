@@ -4,17 +4,37 @@ import { Channel } from "../models/channel.model.js";
 import { ChannelMember } from "../models/channel-member.model.js";
 import { TeamMember } from "../models/team-member.model.js";
 import { Conversation } from "../models/conversation.model.js";
+import { WorkspaceMember } from "../models/workspace-member.model.js";
+import { User } from "../models/user.model.js";
 
+interface JoinChannelOptions {
+  // Skip the "joined" acknowledgements (used by typing events).
+  silent?: boolean;
+}
+
+/**
+ * Joins the socket to a channel room after checking access.
+ * Returns true when the socket is in the room afterwards.
+ */
 export const joinChannel = async (
   io: Server,
   socket: AuthenticatedSocket,
   channelId: string,
-): Promise<void> => {
-  if (!/^[a-f\d]{24}$/i.test(channelId)) {
+  options: JoinChannelOptions = {},
+): Promise<boolean> => {
+  if (typeof channelId !== "string" || !/^[a-f\d]{24}$/i.test(channelId)) {
     socket.emit("channel:error", {
       message: "Invalid channel ID",
     });
-    return;
+    return false;
+  }
+
+  const roomName = `channel:${channelId}`;
+
+  // Access was verified when the socket joined, and removals kick the socket
+  // out of the room, so typing events can skip the database round trips.
+  if (options.silent && socket.rooms.has(roomName)) {
+    return true;
   }
 
   const channel = await Channel.findById(channelId);
@@ -23,7 +43,7 @@ export const joinChannel = async (
     socket.emit("channel:error", {
       message: "Channel not found",
     });
-    return;
+    return false;
   }
 
   const userId = socket.user?.userId;
@@ -32,7 +52,7 @@ export const joinChannel = async (
     socket.emit("channel:error", {
       message: "Authentication required",
     });
-    return;
+    return false;
   }
 
   const teamMembership = await TeamMember.findOne({
@@ -44,7 +64,7 @@ export const joinChannel = async (
     socket.emit("channel:error", {
       message: "You are not a member of this team",
     });
-    return;
+    return false;
   }
 
   if (channel.type === "private") {
@@ -57,30 +77,32 @@ export const joinChannel = async (
       socket.emit("channel:error", {
         message: "You are not a member of this private channel",
       });
-      return;
+      return false;
     }
   }
 
-  const roomName = `channel:${channelId}`;
-
   await socket.join(roomName);
 
-  socket.emit("channel:joined", {
-    channelId,
-    message: "Joined channel successfully",
-  });
+  if (!options.silent) {
+    socket.emit("channel:joined", {
+      channelId,
+      message: "Joined channel successfully",
+    });
 
-  socket.to(roomName).emit("channel:user-joined", {
-    channelId,
-    userId,
-  });
+    socket.to(roomName).emit("channel:user-joined", {
+      channelId,
+      userId,
+    });
+  }
+
+  return true;
 };
 
 export const leaveChannel = async (
   socket: AuthenticatedSocket,
   channelId: string,
 ): Promise<void> => {
-  if (!/^[a-f\d]{24}$/i.test(channelId)) {
+  if (typeof channelId !== "string" || !/^[a-f\d]{24}$/i.test(channelId)) {
     socket.emit("channel:error", {
       message: "Invalid channel ID",
     });
@@ -101,6 +123,10 @@ export const joinConversation = async (
 ) => {
   const userId = socket.user?.userId;
 
+  if (typeof conversationId !== "string" || !/^[a-f\d]{24}$/i.test(conversationId)) {
+    throw new Error("Invalid conversation ID");
+  }
+
   const conversation = await Conversation.findOne({
     _id: conversationId,
     participants: userId,
@@ -120,16 +146,49 @@ export const leaveConversation = async (
   await socket.leave(`dm:${conversationId}`);
 };
 
+// userId -> socket ids (a user can have several tabs/devices)
 const onlineUsers = new Map<string, Set<string>>();
 
-export const registerUserSocket = (io: Server, socket: AuthenticatedSocket) => {
+const workspaceRooms = (socket: AuthenticatedSocket): string[] =>
+  ((socket.data.workspaceIds as string[] | undefined) ?? []).map(
+    (id) => `workspace:${id}`,
+  );
+
+/**
+ * Registers the socket as online. Presence is scoped to workspaces: a user is
+ * only announced to (and sees) people who share at least one workspace.
+ */
+export const registerUserSocket = async (
+  _io: Server,
+  socket: AuthenticatedSocket,
+) => {
   const userId = socket.user?.userId;
+
   if (!userId) {
     console.error("User ID is missing in the authenticated socket.");
     return;
   }
-  let socketIds = onlineUsers.get(userId);
 
+  const [memberships, user] = await Promise.all([
+    WorkspaceMember.find({ user: userId }).select("workspace"),
+    User.findById(userId).select("name"),
+  ]);
+
+  // The client may have disconnected while we were querying.
+  if (!socket.connected) return;
+
+  const workspaceIds = memberships.map((m) => m.workspace.toString());
+
+  socket.data.workspaceIds = workspaceIds;
+  socket.data.name = user?.name;
+
+  const rooms = workspaceIds.map((id) => `workspace:${id}`);
+
+  if (rooms.length > 0) {
+    await socket.join(rooms);
+  }
+
+  let socketIds = onlineUsers.get(userId);
   const isFirstConnection = !socketIds || socketIds.size === 0;
 
   if (!socketIds) {
@@ -139,15 +198,26 @@ export const registerUserSocket = (io: Server, socket: AuthenticatedSocket) => {
 
   socketIds.add(socket.id);
 
-  // Notify others only when the user first comes online.
-  if (isFirstConnection) {
-    socket.broadcast.emit("presence:online", { userId });
+  // An empty room list would broadcast to everyone, so guard it.
+  if (isFirstConnection && rooms.length > 0) {
+    socket.to(rooms).emit("presence:online", { userId });
   }
 
-  // Send the current online users to this socket.
-  socket.emit("presence:online-users", {
-    userIds: Array.from(onlineUsers.keys()),
-  });
+  // Tell this socket who is online among the people it shares workspaces with.
+  let visibleUserIds: string[] = [];
+
+  if (workspaceIds.length > 0) {
+    const peers = await WorkspaceMember.find({
+      workspace: { $in: workspaceIds },
+      user: { $in: Array.from(onlineUsers.keys()) },
+    }).distinct("user");
+
+    visibleUserIds = peers.map((id) => id.toString());
+  }
+
+  if (!visibleUserIds.includes(userId)) visibleUserIds.push(userId);
+
+  socket.emit("presence:online-users", { userIds: visibleUserIds });
 };
 
 export const unregisterUserSocket = (
@@ -155,10 +225,9 @@ export const unregisterUserSocket = (
   socket: AuthenticatedSocket,
 ) => {
   const userId = socket.user?.userId;
-  if (!userId) {
-    console.error("User ID is missing in the authenticated socket.");
-    return;
-  }
+
+  if (!userId) return;
+
   const socketIds = onlineUsers.get(userId);
 
   if (!socketIds) return;
@@ -168,6 +237,11 @@ export const unregisterUserSocket = (
   // Keep the user online if another tab/device is connected.
   if (socketIds.size === 0) {
     onlineUsers.delete(userId);
-    io.emit("presence:offline", { userId });
+
+    const rooms = workspaceRooms(socket);
+
+    if (rooms.length > 0) {
+      io.to(rooms).emit("presence:offline", { userId });
+    }
   }
 };

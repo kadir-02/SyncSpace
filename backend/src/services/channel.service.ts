@@ -1,5 +1,9 @@
+import { Types } from "mongoose";
 import { Channel } from "../models/channel.model.js";
 import { ChannelMember } from "../models/channel-member.model.js";
+import { Message } from "../models/message.model.js";
+import { MessageRead } from "../models/message-read.model.js";
+import { Notification } from "../models/notification.model.js";
 import { Team } from "../models/team.model.js";
 import { TeamMember } from "../models/team-member.model.js";
 import { WorkspaceMember } from "../models/workspace-member.model.js";
@@ -8,6 +12,57 @@ import {
   CreateChannelInput,
   UpdateChannelInput,
 } from "../validations/channel.validation.js";
+import { createNotification } from "./notification.service.js";
+import { deleteFilesByChannels } from "./file.service.js";
+import {
+  closeChannelRooms,
+  removeUserFromRooms,
+} from "../utils/socket-rooms.js";
+
+/**
+ * Deletes channels together with everything that hangs off them:
+ * memberships, messages, read receipts, notifications and uploaded files.
+ */
+export const deleteChannelsCascade = async (channelIds: Types.ObjectId[]) => {
+  if (channelIds.length === 0) return;
+
+  await deleteFilesByChannels(channelIds);
+
+  await Promise.all([
+    ChannelMember.deleteMany({ channel: { $in: channelIds } }),
+    MessageRead.deleteMany({ channel: { $in: channelIds } }),
+    Message.deleteMany({ channel: { $in: channelIds } }),
+    Notification.deleteMany({ channel: { $in: channelIds } }),
+    Channel.deleteMany({ _id: { $in: channelIds } }),
+  ]);
+
+  closeChannelRooms(channelIds.map((id) => id.toString()));
+};
+
+/**
+ * Removes a user's private-channel memberships for a team and kicks their live
+ * sockets out of those channel rooms.
+ */
+export const removeUserFromTeamChannels = async (
+  teamId: string | Types.ObjectId,
+  userId: string,
+) => {
+  const channelIds = (await Channel.find({ team: teamId }).distinct(
+    "_id",
+  )) as Types.ObjectId[];
+
+  if (channelIds.length === 0) return;
+
+  await ChannelMember.deleteMany({
+    user: userId,
+    channel: { $in: channelIds },
+  });
+
+  removeUserFromRooms(
+    userId,
+    channelIds.map((id) => `channel:${id.toString()}`),
+  );
+};
 
 export const createChannel = async (
   teamId: string,
@@ -96,16 +151,15 @@ export const getTeamChannels = async (teamId: string, userId: string) => {
     throw new AppError("You are not a member of this team", 403);
   }
 
+  const privateChannelIds = await ChannelMember.find({
+    user: userId,
+  }).distinct("channel");
+
   const channels = await Channel.find({
     team: teamId,
     $or: [
       { type: "public" },
-      {
-        type: "private",
-        _id: {
-          $in: await ChannelMember.find({ user: userId }).distinct("channel"),
-        },
-      },
+      { type: "private", _id: { $in: privateChannelIds } },
     ],
   })
     .populate("createdBy", "name email avatar")
@@ -158,10 +212,14 @@ export const updateChannel = async (
     throw new AppError("Channel not found", 404);
   }
 
-  const workspaceMembership = await WorkspaceMember.findOne({
-    workspace: (await Team.findById(channel.team))?.workspace,
-    user: userId,
-  });
+  const team = await Team.findById(channel.team);
+
+  const workspaceMembership = team
+    ? await WorkspaceMember.findOne({
+        workspace: team.workspace,
+        user: userId,
+      })
+    : null;
 
   if (
     !workspaceMembership ||
@@ -192,20 +250,36 @@ export const updateChannel = async (
 
   if (data.type !== undefined && data.type !== channel.type) {
     if (data.type === "private") {
-      // Make the creator an explicit member of the private channel.
-      await ChannelMember.updateOne(
-        {
-          channel: channel._id,
-          user: channel.createdBy,
-        },
-        {
-          $setOnInsert: {
-            channel: channel._id,
-            user: channel.createdBy,
+      // Keep everyone who currently has access (all team members) plus the
+      // creator, so converting to private doesn't silently lock people out.
+      const teamMembers = await TeamMember.find({
+        team: channel.team,
+      }).select("user");
+
+      const userIds = new Set(teamMembers.map((m) => m.user.toString()));
+      userIds.add(channel.createdBy.toString());
+
+      await ChannelMember.bulkWrite(
+        Array.from(userIds).map((memberId) => ({
+          updateOne: {
+            filter: {
+              channel: channel._id,
+              user: new Types.ObjectId(memberId),
+            },
+            update: {
+              $setOnInsert: {
+                channel: channel._id,
+                user: new Types.ObjectId(memberId),
+                joinedAt: new Date(),
+              },
+            },
+            upsert: true,
           },
-        },
-        { upsert: true },
+        })),
       );
+    } else {
+      // Public channels use team membership; drop stale explicit members.
+      await ChannelMember.deleteMany({ channel: channel._id });
     }
 
     channel.type = data.type;
@@ -244,8 +318,7 @@ export const deleteChannel = async (channelId: string, userId: string) => {
     );
   }
 
-  await ChannelMember.deleteMany({ channel: channel._id });
-  await channel.deleteOne();
+  await deleteChannelsCascade([channel._id]);
 
   return { id: channel._id };
 };
@@ -295,8 +368,7 @@ export const addChannelMember = async (
   });
 
   const isWorkspaceAdmin =
-    workspaceMembership &&
-    ["owner", "admin"].includes(workspaceMembership.role);
+    workspaceMembership && ["owner", "admin"].includes(workspaceMembership.role);
 
   const isChannelCreator = channel.createdBy.toString() === currentUserId;
 
@@ -320,6 +392,21 @@ export const addChannelMember = async (
     channel: channelId,
     user: targetUserId,
   });
+
+  try {
+    await createNotification({
+      recipient: targetUserId,
+      sender: currentUserId,
+      type: "channel_invite",
+      title: "Added to a private channel",
+      message: `You were added to #${channel.name}`,
+      resourceId: channel._id.toString(),
+      resourceType: "Channel",
+      channel: channel._id.toString(),
+    });
+  } catch (error) {
+    console.error("Channel invite notification failed:", error);
+  }
 
   return {
     id: member._id,
@@ -367,8 +454,7 @@ export const getChannelMembers = async (channelId: string, userId: string) => {
     : null;
 
   const canManage =
-    workspaceMembership &&
-    ["owner", "admin"].includes(workspaceMembership.role);
+    workspaceMembership && ["owner", "admin"].includes(workspaceMembership.role);
 
   if (!channelMembership && !canManage) {
     throw new AppError("You do not have access to this private channel", 403);
@@ -415,8 +501,7 @@ export const removeChannelMember = async (
   });
 
   const isWorkspaceAdmin =
-    workspaceMembership &&
-    ["owner", "admin"].includes(workspaceMembership.role);
+    workspaceMembership && ["owner", "admin"].includes(workspaceMembership.role);
 
   const isChannelCreator = channel.createdBy.toString() === currentUserId;
 
@@ -439,6 +524,9 @@ export const removeChannelMember = async (
   if (!removed) {
     throw new AppError("Channel member not found", 404);
   }
+
+  // Stop live message delivery to the removed user.
+  removeUserFromRooms(targetUserId, [`channel:${channelId}`]);
 
   return { userId: targetUserId };
 };

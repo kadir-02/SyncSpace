@@ -5,6 +5,7 @@ export interface IFile {
   publicId: string;
   url: string;
   mimeType: string;
+  resourceType?: "image" | "video" | "raw";
   size: number;
   uploadedBy: Types.ObjectId;
   workspace: Types.ObjectId;
@@ -32,6 +33,10 @@ const fileSchema = new Schema<IFile>(
     mimeType: {
       type: String,
       required: true,
+    },
+    resourceType: {
+      type: String,
+      enum: ["image", "video", "raw"],
     },
     size: {
       type: Number,

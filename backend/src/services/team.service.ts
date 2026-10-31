@@ -1,6 +1,8 @@
+import { Types } from "mongoose";
 import { Team } from "../models/team.model.js";
 import { TeamMember } from "../models/team-member.model.js";
 import { WorkspaceMember } from "../models/workspace-member.model.js";
+import { Channel } from "../models/channel.model.js";
 import { AppError } from "../utils/app-error.js";
 import {
   CreateTeamInput,
@@ -8,25 +10,78 @@ import {
   UpdateTeamMemberRoleInput,
   UpdateTeamInput,
 } from "../validations/team.validation.js";
+import {
+  deleteChannelsCascade,
+  removeUserFromTeamChannels,
+} from "./channel.service.js";
+import { createNotification } from "./notification.service.js";
+
+const isManagerRole = (role?: string | null) =>
+  role === "owner" || role === "admin";
+
+const getWorkspaceMembershipOrThrow = async (
+  workspaceId: string | Types.ObjectId,
+  userId: string,
+) => {
+  const membership = await WorkspaceMember.findOne({
+    workspace: workspaceId,
+    user: userId,
+  });
+
+  if (!membership) {
+    throw new AppError("You are not a member of this workspace", 403);
+  }
+
+  return membership;
+};
+
+const getTeamOrThrow = async (teamId: string) => {
+  const team = await Team.findById(teamId);
+
+  if (!team) {
+    throw new AppError("Team not found", 404);
+  }
+
+  return team;
+};
+
+const serializeCreator = (creator: any) =>
+  creator
+    ? {
+        id: creator._id,
+        name: creator.name,
+        email: creator.email,
+        avatar: creator.avatar,
+      }
+    : null;
+
+/**
+ * Deletes teams with their channels (and everything in them) and memberships.
+ */
+export const deleteTeamsCascade = async (teamIds: Types.ObjectId[]) => {
+  if (teamIds.length === 0) return;
+
+  const channelIds = (await Channel.find({
+    team: { $in: teamIds },
+  }).distinct("_id")) as Types.ObjectId[];
+
+  await deleteChannelsCascade(channelIds);
+
+  await TeamMember.deleteMany({ team: { $in: teamIds } });
+  await Team.deleteMany({ _id: { $in: teamIds } });
+};
 
 export const createTeam = async (
   workspaceId: string,
   userId: string,
   data: CreateTeamInput,
 ) => {
-  const workspaceMembership = await WorkspaceMember.findOne({
-    workspace: workspaceId,
-    user: userId,
-  });
+  const workspaceMembership = await getWorkspaceMembershipOrThrow(
+    workspaceId,
+    userId,
+  );
 
-  if (!workspaceMembership) {
-    throw new AppError("You are not a member of this workspace", 403);
-  }
-
-  if (
-    workspaceMembership.role !== "owner" &&
-    workspaceMembership.role !== "admin"
-  ) {
+  if (!isManagerRole(workspaceMembership.role)) {
     throw new AppError("Only workspace owner or admin can create a team", 403);
   }
 
@@ -65,14 +120,7 @@ export const getWorkspaceTeams = async (
   workspaceId: string,
   userId: string,
 ) => {
-  const membership = await WorkspaceMember.findOne({
-    workspace: workspaceId,
-    user: userId,
-  });
-
-  if (!membership) {
-    throw new AppError("You are not a member of this workspace", 403);
-  }
+  await getWorkspaceMembershipOrThrow(workspaceId, userId);
 
   const teams = await Team.find({
     workspace: workspaceId,
@@ -80,24 +128,30 @@ export const getWorkspaceTeams = async (
     .populate("createdBy", "name email avatar")
     .sort({ createdAt: -1 });
 
-  return teams.map((team) => {
-    const creator = team.createdBy as any;
-
-    return {
-      id: team._id,
-      name: team.name,
-      description: team.description,
-      workspace: team.workspace,
-      createdBy: {
-        id: creator._id,
-        name: creator.name,
-        email: creator.email,
-        avatar: creator.avatar,
-      },
-      createdAt: team.createdAt,
-      updatedAt: team.updatedAt,
-    };
+  // Tell the client which teams the caller belongs to.
+  const memberships = await TeamMember.find({
+    user: userId,
+    team: { $in: teams.map((team) => team._id) },
   });
+
+  const roleByTeam = new Map(
+    memberships.map((membership) => [
+      membership.team.toString(),
+      membership.role,
+    ]),
+  );
+
+  return teams.map((team) => ({
+    id: team._id,
+    name: team.name,
+    description: team.description,
+    workspace: team.workspace,
+    createdBy: serializeCreator(team.createdBy),
+    isMember: roleByTeam.has(team._id.toString()),
+    myRole: roleByTeam.get(team._id.toString()) ?? null,
+    createdAt: team.createdAt,
+    updatedAt: team.updatedAt,
+  }));
 };
 
 export const getTeamById = async (teamId: string, userId: string) => {
@@ -110,28 +164,21 @@ export const getTeamById = async (teamId: string, userId: string) => {
     throw new AppError("Team not found", 404);
   }
 
-  const workspaceMembership = await WorkspaceMember.findOne({
-    workspace: team.workspace,
+  await getWorkspaceMembershipOrThrow(team.workspace, userId);
+
+  const teamMembership = await TeamMember.findOne({
+    team: teamId,
     user: userId,
   });
-
-  if (!workspaceMembership) {
-    throw new AppError("You are not a member of this workspace", 403);
-  }
-
-  const creator = team.createdBy as any;
 
   return {
     id: team._id,
     name: team.name,
     description: team.description,
     workspace: team.workspace,
-    createdBy: {
-      id: creator._id,
-      name: creator.name,
-      email: creator.email,
-      avatar: creator.avatar,
-    },
+    createdBy: serializeCreator(team.createdBy),
+    isMember: Boolean(teamMembership),
+    myRole: teamMembership?.role ?? null,
     createdAt: team.createdAt,
     updatedAt: team.updatedAt,
   };
@@ -142,26 +189,15 @@ export const addTeamMember = async (
   currentUserId: string,
   data: AddTeamMemberInput,
 ) => {
-  const team = await Team.findById(teamId);
+  const team = await getTeamOrThrow(teamId);
 
-  if (!team) {
-    throw new AppError("Team not found", 404);
-  }
-
-  // Check current user's workspace membership
-  const currentWorkspaceMembership = await WorkspaceMember.findOne({
-    workspace: team.workspace,
-    user: currentUserId,
-  });
-
-  if (!currentWorkspaceMembership) {
-    throw new AppError("You are not a member of this workspace", 403);
-  }
+  const currentWorkspaceMembership = await getWorkspaceMembershipOrThrow(
+    team.workspace,
+    currentUserId,
+  );
 
   // Only workspace owner/admin or team lead can add members
-  const isWorkspaceManager =
-    currentWorkspaceMembership.role === "owner" ||
-    currentWorkspaceMembership.role === "admin";
+  const isWorkspaceManager = isManagerRole(currentWorkspaceMembership.role);
 
   const isTeamLead = await TeamMember.findOne({
     team: teamId,
@@ -199,6 +235,20 @@ export const addTeamMember = async (
     role: data.role,
   });
 
+  try {
+    await createNotification({
+      recipient: data.userId,
+      sender: currentUserId,
+      type: "team_invite",
+      title: "Added to a team",
+      message: `You were added to the team ${team.name}`,
+      resourceId: team._id.toString(),
+      resourceType: "Team",
+    });
+  } catch (error) {
+    console.error("Team invite notification failed:", error);
+  }
+
   return {
     id: member._id,
     team: member.team,
@@ -209,18 +259,20 @@ export const addTeamMember = async (
 };
 
 export const getTeamMembers = async (teamId: string, userId: string) => {
-  const team = await Team.findById(teamId);
+  const team = await getTeamOrThrow(teamId);
 
-  if (!team) {
-    throw new AppError("Team not found", 404);
-  }
+  const workspaceMembership = await getWorkspaceMembershipOrThrow(
+    team.workspace,
+    userId,
+  );
 
   const currentMember = await TeamMember.findOne({
     team: teamId,
     user: userId,
   });
 
-  if (!currentMember) {
+  // Workspace owners/admins can view any team's roster.
+  if (!currentMember && !isManagerRole(workspaceMembership.role)) {
     throw new AppError("You are not a member of this team", 403);
   }
 
@@ -252,39 +304,29 @@ export const updateTeamMemberRole = async (
   memberUserId: string,
   data: UpdateTeamMemberRoleInput,
 ) => {
-  const team = await Team.findById(teamId);
-
-  if (!team) {
-    throw new AppError("Team not found", 404);
-  }
+  const team = await getTeamOrThrow(teamId);
 
   if (currentUserId === memberUserId) {
     throw new AppError("You cannot change your own team role", 400);
   }
 
-  const currentWorkspaceMembership = await WorkspaceMember.findOne({
-    workspace: team.workspace,
-    user: currentUserId,
-  });
-
-  if (!currentWorkspaceMembership) {
-    throw new AppError("You are not a member of this workspace", 403);
-  }
+  const currentWorkspaceMembership = await getWorkspaceMembershipOrThrow(
+    team.workspace,
+    currentUserId,
+  );
 
   const currentTeamMember = await TeamMember.findOne({
     team: teamId,
     user: currentUserId,
   });
 
-  if (!currentTeamMember) {
+  const isWorkspaceManager = isManagerRole(currentWorkspaceMembership.role);
+  const isTeamLead = currentTeamMember?.role === "lead";
+
+  // Workspace owners/admins don't need to be team members to manage roles.
+  if (!isWorkspaceManager && !currentTeamMember) {
     throw new AppError("You are not a member of this team", 403);
   }
-
-  const isWorkspaceManager =
-    currentWorkspaceMembership.role === "owner" ||
-    currentWorkspaceMembership.role === "admin";
-
-  const isTeamLead = currentTeamMember.role === "lead";
 
   if (!isWorkspaceManager && !isTeamLead) {
     throw new AppError("You do not have permission to change team roles", 403);
@@ -331,39 +373,29 @@ export const removeTeamMember = async (
   currentUserId: string,
   memberUserId: string,
 ) => {
-  const team = await Team.findById(teamId);
-
-  if (!team) {
-    throw new AppError("Team not found", 404);
-  }
+  const team = await getTeamOrThrow(teamId);
 
   if (currentUserId === memberUserId) {
     throw new AppError("You cannot remove yourself from the team", 400);
   }
 
-  const currentWorkspaceMembership = await WorkspaceMember.findOne({
-    workspace: team.workspace,
-    user: currentUserId,
-  });
-
-  if (!currentWorkspaceMembership) {
-    throw new AppError("You are not a member of this workspace", 403);
-  }
+  const currentWorkspaceMembership = await getWorkspaceMembershipOrThrow(
+    team.workspace,
+    currentUserId,
+  );
 
   const currentTeamMember = await TeamMember.findOne({
     team: teamId,
     user: currentUserId,
   });
 
-  if (!currentTeamMember) {
+  const isWorkspaceManager = isManagerRole(currentWorkspaceMembership.role);
+  const isTeamLead = currentTeamMember?.role === "lead";
+
+  // Workspace owners/admins don't need to be team members to manage members.
+  if (!isWorkspaceManager && !currentTeamMember) {
     throw new AppError("You are not a member of this team", 403);
   }
-
-  const isWorkspaceManager =
-    currentWorkspaceMembership.role === "owner" ||
-    currentWorkspaceMembership.role === "admin";
-
-  const isTeamLead = currentTeamMember.role === "lead";
 
   if (!isWorkspaceManager && !isTeamLead) {
     throw new AppError(
@@ -400,6 +432,9 @@ export const removeTeamMember = async (
     _id: targetMember._id,
   });
 
+  // Revoke private-channel access and live channel rooms for this team.
+  await removeUserFromTeamChannels(teamId, memberUserId);
+
   return null;
 };
 
@@ -408,24 +443,14 @@ export const updateTeam = async (
   userId: string,
   data: UpdateTeamInput,
 ) => {
-  const team = await Team.findById(teamId);
+  const team = await getTeamOrThrow(teamId);
 
-  if (!team) {
-    throw new AppError("Team not found", 404);
-  }
+  const workspaceMembership = await getWorkspaceMembershipOrThrow(
+    team.workspace,
+    userId,
+  );
 
-  const workspaceMembership = await WorkspaceMember.findOne({
-    workspace: team.workspace,
-    user: userId,
-  });
-
-  if (!workspaceMembership) {
-    throw new AppError("You are not a member of this workspace", 403);
-  }
-
-  const isWorkspaceManager =
-    workspaceMembership.role === "owner" ||
-    workspaceMembership.role === "admin";
+  const isWorkspaceManager = isManagerRole(workspaceMembership.role);
 
   const teamMembership = await TeamMember.findOne({
     team: teamId,
@@ -470,47 +495,19 @@ export const updateTeam = async (
   };
 };
 
+export const deleteTeam = async (teamId: string, userId: string) => {
+  const team = await getTeamOrThrow(teamId);
 
-export const deleteTeam = async (
-  teamId: string,
-  userId: string
-) => {
-  const team = await Team.findById(teamId);
+  const workspaceMembership = await getWorkspaceMembershipOrThrow(
+    team.workspace,
+    userId,
+  );
 
-  if (!team) {
-    throw new AppError("Team not found", 404);
+  if (!isManagerRole(workspaceMembership.role)) {
+    throw new AppError("Only workspace owner or admin can delete a team", 403);
   }
 
-  const workspaceMembership =
-    await WorkspaceMember.findOne({
-      workspace: team.workspace,
-      user: userId,
-    });
-
-  if (!workspaceMembership) {
-    throw new AppError(
-      "You are not a member of this workspace",
-      403
-    );
-  }
-
-  if (
-    workspaceMembership.role !== "owner" &&
-    workspaceMembership.role !== "admin"
-  ) {
-    throw new AppError(
-      "Only workspace owner or admin can delete a team",
-      403
-    );
-  }
-
-  await TeamMember.deleteMany({
-    team: teamId,
-  });
-
-  await Team.deleteOne({
-    _id: teamId,
-  });
+  await deleteTeamsCascade([team._id]);
 
   return null;
 };

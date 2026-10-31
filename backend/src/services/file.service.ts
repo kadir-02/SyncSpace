@@ -1,6 +1,6 @@
-// import { v2 as cloudinary } from "cloudinary";
+import { Types } from "mongoose";
 import cloudinary from "../config/cloudinary.js";
-import { File } from "../models/file.model.js";
+import { File, type IFile } from "../models/file.model.js";
 import { WorkspaceMember } from "../models/workspace-member.model.js";
 import { Channel } from "../models/channel.model.js";
 import { ChannelMember } from "../models/channel-member.model.js";
@@ -14,6 +14,8 @@ interface UploadFileParams {
   workspaceId: string;
   channelId?: string;
 }
+
+type CloudinaryResourceType = "image" | "video" | "raw";
 
 const checkWorkspaceAccess = async (workspaceId: string, userId: string) => {
   const membership = await WorkspaceMember.findOne({
@@ -66,6 +68,26 @@ const checkChannelAccess = async (
       throw new AppError("You are not a member of this private channel", 403);
     }
   }
+};
+
+// Older records have no stored resource type, so fall back to what Cloudinary
+// would have chosen for "auto" uploads (PDFs are stored as images).
+const getResourceType = (
+  file: Pick<IFile, "resourceType" | "mimeType">,
+): CloudinaryResourceType => {
+  if (file.resourceType) return file.resourceType;
+
+  return file.mimeType.startsWith("image/") || file.mimeType === "application/pdf"
+    ? "image"
+    : "raw";
+};
+
+const destroyFromCloudinary = async (
+  file: Pick<IFile, "publicId" | "resourceType" | "mimeType">,
+) => {
+  await cloudinary.uploader.destroy(file.publicId, {
+    resource_type: getResourceType(file),
+  });
 };
 
 export const uploadFile = async ({
@@ -123,6 +145,7 @@ export const uploadFile = async ({
       publicId: uploadResult.public_id,
       url: uploadResult.secure_url,
       mimeType: file.mimetype,
+      resourceType: uploadResult.resource_type as CloudinaryResourceType,
       size: uploadResult.bytes,
       uploadedBy: userId,
       workspace: workspaceId,
@@ -134,7 +157,7 @@ export const uploadFile = async ({
     // Avoid leaving an orphaned Cloudinary upload if metadata saving fails.
     await cloudinary.uploader
       .destroy(uploadResult.public_id, {
-        resource_type: uploadResult.resource_type as "image" | "video" | "raw",
+        resource_type: uploadResult.resource_type as CloudinaryResourceType,
       })
       .catch(() => undefined);
 
@@ -150,15 +173,45 @@ export const getWorkspaceFiles = async (
 ) => {
   await checkWorkspaceAccess(workspaceId, userId);
 
+  // Files shared in a channel are only listed for people who can access that channel.
+  const teamIds = await TeamMember.find({ user: userId }).distinct("team");
+
+  const channels = await Channel.find({ team: { $in: teamIds } }).select(
+    "_id type",
+  );
+
+  const privateChannelIds = new Set(
+    (await ChannelMember.find({ user: userId }).distinct("channel")).map(
+      (id) => id.toString(),
+    ),
+  );
+
+  const accessibleChannelIds = channels
+    .filter(
+      (channel) =>
+        channel.type !== "private" ||
+        privateChannelIds.has(channel._id.toString()),
+    )
+    .map((channel) => channel._id);
+
+  const filter = {
+    workspace: workspaceId,
+    $or: [
+      { channel: null },
+      { uploadedBy: userId },
+      { channel: { $in: accessibleChannelIds } },
+    ],
+  };
+
   const skip = (page - 1) * limit;
 
   const [files, total] = await Promise.all([
-    File.find({ workspace: workspaceId })
+    File.find(filter)
       .populate("uploadedBy", "name email avatar")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit),
-    File.countDocuments({ workspace: workspaceId }),
+    File.countDocuments(filter),
   ]);
 
   return {
@@ -185,13 +238,29 @@ export const deleteFile = async (fileId: string, userId: string) => {
     throw new AppError("You can only delete files you uploaded", 403);
   }
 
-  const resourceType = file.mimeType.startsWith("image/") ? "image" : "raw";
-
-  await cloudinary.uploader.destroy(file.publicId, {
-    resource_type: resourceType,
-  });
-
+  await destroyFromCloudinary(file);
   await file.deleteOne();
 
   return { fileId };
+};
+
+const deleteFilesWhere = async (filter: Record<string, unknown>) => {
+  const files = await File.find(filter);
+
+  await Promise.all(
+    files.map((file) => destroyFromCloudinary(file).catch(() => undefined)),
+  );
+
+  await File.deleteMany({ _id: { $in: files.map((file) => file._id) } });
+};
+
+// Used when channels / workspaces are deleted so uploads aren't orphaned.
+export const deleteFilesByChannels = async (channelIds: Types.ObjectId[]) => {
+  if (channelIds.length === 0) return;
+
+  await deleteFilesWhere({ channel: { $in: channelIds } });
+};
+
+export const deleteWorkspaceFiles = async (workspaceId: string) => {
+  await deleteFilesWhere({ workspace: workspaceId });
 };

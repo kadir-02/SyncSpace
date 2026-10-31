@@ -17,13 +17,15 @@ export const createMessageController = async (
   req: Request<{ channelId: string }>,
   res: Response,
 ) => {
-  const { content } = createMessageSchema.parse(req.body);
+  const { content, attachmentIds } = createMessageSchema.parse(req.body);
 
   const message = await sendMessage(
     req.params.channelId,
     req.user!.userId,
     content,
+    attachmentIds,
   );
+
   getIO().to(`channel:${req.params.channelId}`).emit("message:new", message);
 
   return sendSuccess(res, 201, "Message sent successfully", message);
@@ -70,6 +72,7 @@ export const updateMessageController = async (
     req.user!.userId,
     content,
   );
+
   getIO()
     .to(`channel:${message.channel.toString()}`)
     .emit("message:updated", message);
@@ -77,14 +80,6 @@ export const updateMessageController = async (
   return sendSuccess(res, 200, "Message updated successfully", message);
 };
 
-// export const deleteMessageController = async (
-//   req: Request<{ messageId: string }>,
-//   res: Response,
-// ) => {
-//   await deleteMessage(req.params.messageId, req.user!.userId);
-
-//   return sendSuccess(res, 200, "Message deleted successfully", null);
-// };
 export const deleteMessageController = async (
   req: Request<{ messageId: string }>,
   res: Response,

@@ -17,6 +17,7 @@ export interface INotification {
   message: string;
   resourceId?: Types.ObjectId;
   resourceType?: string;
+  channel?: Types.ObjectId;
   isRead: boolean;
   readAt?: Date;
   createdAt: Date;
@@ -66,6 +67,11 @@ const notificationSchema = new Schema<INotification>(
     resourceType: {
       type: String,
       trim: true,
+    },
+    // Set for channel-related notifications so the client can navigate.
+    channel: {
+      type: Schema.Types.ObjectId,
+      ref: "Channel",
     },
     isRead: {
       type: Boolean,

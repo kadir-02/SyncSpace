@@ -1,6 +1,5 @@
 import { Message } from "../models/message.model.js";
 import { MessageRead } from "../models/message-read.model.js";
-import { AppError } from "../utils/app-error.js";
 import { checkChannelAccess } from "./message.service.js";
 import mongoose from "mongoose";
 import { getIO } from "../config/socket.js";
@@ -21,8 +20,9 @@ export const markMessagesAsRead = async (
     sender: { $ne: userObjectId },
   }).select("_id");
 
+  // Nothing to mark (e.g. only your own messages) is not an error.
   if (messages.length === 0) {
-    throw new AppError("No eligible messages found", 404);
+    return [];
   }
 
   const readAt = new Date();
@@ -77,7 +77,7 @@ export const getMessageReadReceipts = async (
   }).select("_id");
 
   if (messages.length === 0) {
-    throw new AppError("No messages found", 404);
+    return [];
   }
 
   const validMessageIds = messages.map((message) => message._id);

@@ -1,5 +1,12 @@
+import { randomBytes } from "crypto";
+import { Types } from "mongoose";
 import { Workspace } from "../models/workspace.model.js";
 import { WorkspaceMember } from "../models/workspace-member.model.js";
+import { Team } from "../models/team.model.js";
+import { TeamMember } from "../models/team-member.model.js";
+import { Channel } from "../models/channel.model.js";
+import { ChannelMember } from "../models/channel-member.model.js";
+import { User } from "../models/user.model.js";
 import { AppError } from "../utils/app-error.js";
 import {
   AddWorkspaceMemberInput,
@@ -8,20 +15,50 @@ import {
   UpdateWorkspaceMemberRoleInput,
 } from "../validations/workspace.validation.js";
 import { generateSlug } from "../utils/slug-generator.js";
-import { User } from "../models/user.model.js";
+import { deleteTeamsCascade } from "./team.service.js";
+import { deleteWorkspaceFiles } from "./file.service.js";
+import { createNotification } from "./notification.service.js";
+import {
+  addUserToRooms,
+  closeWorkspaceRoom,
+  removeUserFromRooms,
+} from "../utils/socket-rooms.js";
+
+/**
+ * Removes every trace of a user's access inside a workspace: team memberships,
+ * private-channel memberships and live socket rooms. Without this, a removed
+ * user would keep reading channels because those checks look at team membership.
+ */
+const revokeWorkspaceAccess = async (workspaceId: string, userId: string) => {
+  const teamIds = (await Team.find({ workspace: workspaceId }).distinct(
+    "_id",
+  )) as Types.ObjectId[];
+
+  const channelIds = (await Channel.find({
+    team: { $in: teamIds },
+  }).distinct("_id")) as Types.ObjectId[];
+
+  await Promise.all([
+    TeamMember.deleteMany({ user: userId, team: { $in: teamIds } }),
+    ChannelMember.deleteMany({ user: userId, channel: { $in: channelIds } }),
+  ]);
+
+  removeUserFromRooms(userId, [
+    `workspace:${workspaceId}`,
+    ...channelIds.map((id) => `channel:${id.toString()}`),
+  ]);
+};
 
 export const createWorkspace = async (
   userId: string,
   data: CreateWorkspaceInput,
 ) => {
-  const slug = generateSlug(data.name);
+  // Workspace names don't have to be globally unique; only the slug does.
+  const baseSlug = generateSlug(data.name) || "workspace";
+  let slug = baseSlug;
 
-  const existingWorkspace = await Workspace.findOne({
-    slug,
-  });
-
-  if (existingWorkspace) {
-    throw new AppError("Workspace with this name already exists", 409);
+  while (await Workspace.exists({ slug })) {
+    slug = `${baseSlug}-${randomBytes(2).toString("hex")}`;
   }
 
   const workspace = await Workspace.create({
@@ -108,7 +145,10 @@ export const addWorkspaceMember = async (
     throw new AppError("You do not have permission to add members", 403);
   }
 
-  const user = await User.findById(data.userId);
+  // Members can be added by ID or by email.
+  const user = data.userId
+    ? await User.findById(data.userId)
+    : await User.findOne({ email: data.email });
 
   if (!user) {
     throw new AppError("User not found", 404);
@@ -116,7 +156,7 @@ export const addWorkspaceMember = async (
 
   const existingMember = await WorkspaceMember.findOne({
     workspace: workspaceId,
-    user: data.userId,
+    user: user._id,
   });
 
   if (existingMember) {
@@ -125,13 +165,33 @@ export const addWorkspaceMember = async (
 
   const member = await WorkspaceMember.create({
     workspace: workspaceId,
-    user: data.userId,
+    user: user._id,
     role: data.role,
   });
+
+  // Let the new member's open sessions receive workspace presence right away.
+  addUserToRooms(user._id.toString(), [`workspace:${workspaceId}`]);
+
+  try {
+    const workspace = await Workspace.findById(workspaceId).select("name");
+
+    await createNotification({
+      recipient: user._id.toString(),
+      sender: currentUserId,
+      type: "workspace_invite",
+      title: "Added to a workspace",
+      message: `You were added to ${workspace?.name ?? "a workspace"}`,
+      resourceId: workspaceId,
+      resourceType: "Workspace",
+    });
+  } catch (error) {
+    console.error("Workspace invite notification failed:", error);
+  }
 
   return {
     id: member._id,
     user: user._id,
+    userId: user._id,
     name: user.name,
     email: user.email,
     role: member.role,
@@ -219,6 +279,8 @@ export const removeWorkspaceMember = async (
     _id: member._id,
   });
 
+  await revokeWorkspaceAccess(workspaceId, memberUserId);
+
   return null;
 };
 
@@ -283,6 +345,8 @@ export const leaveWorkspace = async (workspaceId: string, userId: string) => {
     _id: membership._id,
   });
 
+  await revokeWorkspaceAccess(workspaceId, userId);
+
   return null;
 };
 
@@ -300,6 +364,16 @@ export const deleteWorkspace = async (workspaceId: string, userId: string) => {
     );
   }
 
+  const teamIds = (await Team.find({ workspace: workspaceId }).distinct(
+    "_id",
+  )) as Types.ObjectId[];
+
+  // Teams -> channels -> messages / reads / notifications / channel files.
+  await deleteTeamsCascade(teamIds);
+
+  // Remaining workspace-level files (also removed from Cloudinary).
+  await deleteWorkspaceFiles(workspaceId);
+
   await WorkspaceMember.deleteMany({
     workspace: workspaceId,
   });
@@ -307,6 +381,8 @@ export const deleteWorkspace = async (workspaceId: string, userId: string) => {
   await Workspace.deleteOne({
     _id: workspaceId,
   });
+
+  closeWorkspaceRoom(workspaceId);
 
   return null;
 };
