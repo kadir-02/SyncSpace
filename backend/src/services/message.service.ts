@@ -3,6 +3,7 @@ import { Channel } from "../models/channel.model.js";
 import { ChannelMember } from "../models/channel-member.model.js";
 import { TeamMember } from "../models/team-member.model.js";
 import { AppError } from "../utils/app-error.js";
+import { createNotification } from "./notification.service.js";
 
 const checkChannelAccess = async (channelId: string, userId: string) => {
   const channel = await Channel.findById(channelId);
@@ -41,11 +42,52 @@ export const sendMessage = async (
 ) => {
   await checkChannelAccess(channelId, userId);
 
-  return Message.create({
+  const channel = await Channel.findById(channelId);
+
+  if (!channel) {
+    throw new AppError("Channel not found", 404);
+  }
+
+  const message = await Message.create({
     channel: channelId,
     sender: userId,
     content,
   });
+
+  // const channelMembers = await TeamMember.find({
+  //   team: channel.team,
+  //   user: { $ne: userId },
+  // }).select("user");
+
+  let channelMembers;
+
+  if (channel.type === "private") {
+    channelMembers = await ChannelMember.find({
+      channel: channelId,
+      user: { $ne: userId },
+    }).select("user");
+  } else {
+    channelMembers = await TeamMember.find({
+      team: channel.team,
+      user: { $ne: userId },
+    }).select("user");
+  }
+
+  await Promise.all(
+    channelMembers.map((member) =>
+      createNotification({
+        recipient: member.user.toString(),
+        sender: userId,
+        type: "message",
+        title: "New channel message",
+        message: content,
+        resourceId: message._id.toString(),
+        resourceType: "Message",
+      }),
+    ),
+  );
+
+  return message;
 };
 
 export const getChannelMessages = async (

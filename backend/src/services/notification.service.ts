@@ -1,6 +1,11 @@
 import { Notification } from "../models/notification.model.js";
 import { AppError } from "../utils/app-error.js";
 import type { NotificationType } from "../models/notification.model.js";
+import {
+  emitNotification,
+  emitNotificationRead,
+  emitNotificationDeleted,
+} from "../utils/notification-emitter.js";
 
 export const getNotifications = async (
   userId: string,
@@ -57,6 +62,8 @@ export const markNotificationAsRead = async (
     notification.isRead = true;
     notification.readAt = new Date();
     await notification.save();
+
+    emitNotificationRead(userId, notificationId);
   }
 
   return notification;
@@ -86,9 +93,10 @@ export const deleteNotification = async (
 
   await notification.deleteOne();
 
+  emitNotificationDeleted(userId, notificationId);
+
   return { notificationId };
 };
-
 
 export const createNotification = async (data: {
   recipient: string;
@@ -99,8 +107,12 @@ export const createNotification = async (data: {
   resourceId?: string;
   resourceType?: string;
 }) => {
-  return Notification.create({
+  const notification = await Notification.create({
     ...data,
     isRead: false,
   });
+
+  emitNotification(data.recipient, notification);
+
+  return notification;
 };

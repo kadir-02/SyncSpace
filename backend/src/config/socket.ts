@@ -26,6 +26,11 @@ export const initializeSocket = (httpServer: HttpServer) => {
       authenticatedSocket.disconnect(true);
       return;
     }
+    const userId = authenticatedSocket.user.userId;
+
+    authenticatedSocket.join(`user:${userId}`);
+
+    console.log(`User joined notification room: user:${userId}`);
 
     console.log(
       `Authenticated socket connected: ${authenticatedSocket.id}, user: ${authenticatedSocket.user.userId}`,
