@@ -3,6 +3,7 @@ import type { AuthenticatedSocket } from "../middlewares/socket-auth.middleware.
 import { Channel } from "../models/channel.model.js";
 import { ChannelMember } from "../models/channel-member.model.js";
 import { TeamMember } from "../models/team-member.model.js";
+import { Conversation } from "../models/conversation.model.js";
 
 export const joinChannel = async (
   io: Server,
@@ -92,4 +93,29 @@ export const leaveChannel = async (
     channelId,
     message: "Left channel successfully",
   });
+};
+
+export const joinConversation = async (
+  socket: AuthenticatedSocket,
+  conversationId: string,
+) => {
+  const userId = socket.user?.userId;
+
+  const conversation = await Conversation.findOne({
+    _id: conversationId,
+    participants: userId,
+  });
+
+  if (!conversation) {
+    throw new Error("Conversation not found or access denied");
+  }
+
+  await socket.join(`dm:${conversationId}`);
+};
+
+export const leaveConversation = async (
+  socket: AuthenticatedSocket,
+  conversationId: string,
+) => {
+  await socket.leave(`dm:${conversationId}`);
 };

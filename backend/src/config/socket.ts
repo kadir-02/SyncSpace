@@ -4,7 +4,12 @@ import {
   socketAuthMiddleware,
   type AuthenticatedSocket,
 } from "../middlewares/socket-auth.middleware.js";
-import { joinChannel, leaveChannel } from "../services/socket.service.js";
+import {
+  joinChannel,
+  leaveChannel,
+  joinConversation,
+  leaveConversation,
+} from "../services/socket.service.js";
 
 let io: Server;
 
@@ -59,6 +64,36 @@ export const initializeSocket = (httpServer: HttpServer) => {
           console.error("Channel leave error:", error);
           authenticatedSocket.emit("channel:error", {
             message: "Failed to leave channel",
+          });
+        }
+      },
+    );
+
+    authenticatedSocket.on(
+      "dm:join",
+      async (data: { conversationId: string }) => {
+        try {
+          await joinConversation(authenticatedSocket, data?.conversationId);
+        } catch (error) {
+          console.error("DM join error:", error);
+
+          authenticatedSocket.emit("dm:error", {
+            message: "Failed to join conversation",
+          });
+        }
+      },
+    );
+
+    authenticatedSocket.on(
+      "dm:leave",
+      async (data: { conversationId: string }) => {
+        try {
+          await leaveConversation(authenticatedSocket, data?.conversationId);
+        } catch (error) {
+          console.error("DM leave error:", error);
+
+          authenticatedSocket.emit("dm:error", {
+            message: "Failed to leave conversation",
           });
         }
       },
