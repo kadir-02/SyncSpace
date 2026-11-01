@@ -14,6 +14,8 @@ interface UiState {
   sidebarOpen: boolean;
   activeChat: ActiveChat;
   socketConnected: boolean;
+  // User whose profile card is open (null = closed).
+  profileUserId: string | null;
 }
 
 const initialState: UiState = {
@@ -21,6 +23,7 @@ const initialState: UiState = {
   sidebarOpen: false,
   activeChat: null,
   socketConnected: false,
+  profileUserId: null,
 };
 
 const uiSlice = createSlice({
@@ -45,6 +48,9 @@ const uiSlice = createSlice({
     activeChatSet(state, action: PayloadAction<ActiveChat>) {
       state.activeChat = action.payload;
     },
+    profileOpened(state, action: PayloadAction<string | null>) {
+      state.profileUserId = action.payload;
+    },
     socketStatusChanged(state, action: PayloadAction<boolean>) {
       state.socketConnected = action.payload;
     },
@@ -57,5 +63,6 @@ export const {
   sidebarToggled,
   activeChatSet,
   socketStatusChanged,
+  profileOpened,
 } = uiSlice.actions;
 export default uiSlice.reducer;

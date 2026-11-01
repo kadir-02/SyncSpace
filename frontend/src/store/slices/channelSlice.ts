@@ -2,6 +2,7 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import { api } from "@/lib/api";
 import type { Channel, ChannelMember, ChannelType } from "@/types";
 import { apiThunk } from "../thunk";
+import { userUpdated } from "../actions";
 
 interface ChannelState {
   byTeam: Record<string, Channel[]>;
@@ -118,6 +119,16 @@ const channelSlice = createSlice({
       })
       .addCase(addChannelMember.fulfilled, (state, { payload }) => {
         state.members[payload.channelId] = payload.members;
+      })
+      .addCase(userUpdated, (state, { payload }) => {
+        for (const members of Object.values(state.members)) {
+          for (const member of members) {
+            if (member.user.id === payload.id) {
+              member.user.name = payload.name;
+              member.user.avatar = payload.avatar ?? undefined;
+            }
+          }
+        }
       })
       .addCase(removeChannelMember.fulfilled, (state, { payload }) => {
         state.members[payload.channelId] = (state.members[payload.channelId] ?? []).filter(

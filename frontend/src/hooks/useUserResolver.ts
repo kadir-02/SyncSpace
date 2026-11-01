@@ -24,17 +24,23 @@ export function useUserResolver() {
       byId.set(member.userId, { id: member.userId, name: member.name, avatar: member.avatar }),
     );
 
+    // The roster is the live source of truth: a sender embedded in an old
+    // message still carries the name/avatar from when it was sent.
     return (sender: UserLite | string | undefined | null): ResolvedUser => {
+      const id = typeof sender === "string" ? sender : sender?.id;
+
+      if (!id) return { id: "", name: "Unknown user" };
+
+      if (id === me?.id) return { id, name: me.name, avatar: me.avatar };
+
+      const member = byId.get(id);
+      if (member) return member;
+
       if (sender && typeof sender === "object") {
-        return { id: sender.id, name: sender.name, avatar: sender.avatar };
+        return { id, name: sender.name, avatar: sender.avatar };
       }
 
-      if (typeof sender === "string") {
-        if (sender === me?.id) return { id: me.id, name: me.name, avatar: me.avatar };
-        return byId.get(sender) ?? { id: sender, name: "Unknown user" };
-      }
-
-      return { id: "", name: "Unknown user" };
+      return { id, name: "Unknown user" };
     };
   }, [members, me]);
 }

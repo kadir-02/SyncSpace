@@ -5,6 +5,7 @@ import {
   getDirectMessagesController,
   sendDirectMessageController,
   deleteDirectMessageController,
+  updateDirectMessageController,
 } from "../controllers/dm.controller.js";
 import { authMiddleware } from "../middlewares/auth.middleware.js";
 import { asyncHandler } from "../utils/async-handler.js";
@@ -24,6 +25,11 @@ router.get(
 router.post(
   "/conversations/:conversationId/messages",
   asyncHandler(sendDirectMessageController),
+);
+
+router.patch(
+  "/messages/:messageId",
+  asyncHandler(updateDirectMessageController),
 );
 
 router.delete(

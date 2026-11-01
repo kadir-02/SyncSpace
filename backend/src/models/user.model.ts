@@ -5,6 +5,7 @@ export interface IUser extends Document {
   email: string;
   passwordHash: string;
   avatar?: string;
+  avatarPublicId?: string;
   createdAt: Date;
   updatedAt: Date;
   role: "user" | "admin";
@@ -33,6 +34,10 @@ const userSchema = new Schema<IUser>(
 
     avatar: {
       type: String,
+    },
+    avatarPublicId: {
+      type: String,
+      select: false,
     },
 
     role: {

@@ -241,11 +241,17 @@ export function Sidebar() {
       </div>
 
       <div className="flex items-center gap-3 border-t border-slate-800 p-3">
-        <Avatar id={me?.id} name={me?.name} src={me?.avatar} size="md" online />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-white">{me?.name}</p>
-          <p className="truncate text-xs text-slate-400">{me?.email}</p>
-        </div>
+        <Link
+          href={`${base}/profile`}
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 -m-1 hover:bg-slate-800"
+          title="Your profile"
+        >
+          <Avatar id={me?.id} name={me?.name} src={me?.avatar} size="md" online />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-white">{me?.name}</p>
+            <p className="truncate text-xs text-slate-400">View profile</p>
+          </div>
+        </Link>
         <button
           type="button"
           onClick={() => {

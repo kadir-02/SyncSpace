@@ -2,6 +2,7 @@ import { createSlice } from "@reduxjs/toolkit";
 import { api } from "@/lib/api";
 import type { Team, TeamMember, TeamRole } from "@/types";
 import { apiThunk } from "../thunk";
+import { userUpdated } from "../actions";
 
 type LoadStatus = "idle" | "loading" | "ready" | "error";
 
@@ -145,6 +146,16 @@ const teamSlice = createSlice({
           (item) => item.userId === payload.userId,
         );
         if (member) member.teamRole = payload.role;
+      })
+      .addCase(userUpdated, (state, { payload }) => {
+        for (const members of Object.values(state.members)) {
+          for (const member of members) {
+            if (member.userId === payload.id) {
+              member.name = payload.name;
+              member.avatar = payload.avatar ?? undefined;
+            }
+          }
+        }
       })
       .addCase(removeTeamMember.fulfilled, (state, { payload }) => {
         state.members[payload.teamId] = (state.members[payload.teamId] ?? []).filter(

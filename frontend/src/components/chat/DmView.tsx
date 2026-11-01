@@ -14,11 +14,12 @@ import { getSocket } from "@/lib/socket";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   deleteDirectMessage,
+  editDirectMessage,
   fetchConversations,
   fetchDirectMessages,
   sendDirectMessage,
 } from "@/store/slices/dmSlice";
-import { activeChatSet, toastAdded } from "@/store/slices/uiSlice";
+import { activeChatSet, profileOpened, toastAdded } from "@/store/slices/uiSlice";
 import { markDmRead } from "@/store/slices/unreadSlice";
 import { Composer } from "./Composer";
 import { MessageFeed } from "./MessageFeed";
@@ -71,6 +72,7 @@ export function DmView({ conversationId }: { conversationId: string }) {
         createdAt: message.createdAt,
         sender: resolve(message.sender),
         content: message.content,
+        edited: message.edited,
       })),
     [thread?.items, resolve],
   );
@@ -108,6 +110,12 @@ export function DmView({ conversationId }: { conversationId: string }) {
   return (
     <section className="flex h-full min-h-0 flex-col">
       <header className="flex items-center gap-3 border-b border-slate-200 px-5 py-3">
+        <button
+          type="button"
+          onClick={() => other && dispatch(profileOpened(other.id))}
+          className="flex min-w-0 items-center gap-3 text-left"
+          aria-label="View profile"
+        >
         <Avatar
           id={other?.id}
           name={other?.name}
@@ -121,6 +129,7 @@ export function DmView({ conversationId }: { conversationId: string }) {
             {other && online[other.id] ? "Active now" : other?.email}
           </p>
         </div>
+        </button>
       </header>
 
       <MessageFeed
@@ -135,6 +144,19 @@ export function DmView({ conversationId }: { conversationId: string }) {
         emptyDescription="Messages here are private between the two of you."
         onLoadOlder={loadOlder}
         onRetry={() => dispatch(fetchDirectMessages({ conversationId }))}
+        onEdit={async (messageId, content) => {
+          try {
+            await dispatch(editDirectMessage({ messageId, content })).unwrap();
+          } catch (message) {
+            dispatch(
+              toastAdded({
+                kind: "error",
+                title: typeof message === "string" ? message : "Could not edit message",
+              }),
+            );
+            throw message;
+          }
+        }}
         onDelete={async (messageId) => {
           try {
             await dispatch(deleteDirectMessage({ messageId, conversationId })).unwrap();

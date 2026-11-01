@@ -10,6 +10,7 @@ import { User } from "../models/user.model.js";
 import { AppError } from "../utils/app-error.js";
 import {
   AddWorkspaceMemberInput,
+  UpdateWorkspaceInput,
   CreateWorkspaceInput,
   TransferWorkspaceOwnershipInput,
   UpdateWorkspaceMemberRoleInput,
@@ -18,6 +19,7 @@ import { generateSlug } from "../utils/slug-generator.js";
 import { deleteTeamsCascade } from "./team.service.js";
 import { deleteWorkspaceFiles } from "./file.service.js";
 import { createNotification } from "./notification.service.js";
+import { getIO } from "../config/socket.js";
 import {
   addUserToRooms,
   closeWorkspaceRoom,
@@ -121,6 +123,49 @@ export const getWorkspaceById = async (workspaceId: string, userId: string) => {
     role: membership.role,
     createdAt: workspace.createdAt,
     updatedAt: workspace.updatedAt,
+  };
+};
+
+export const updateWorkspace = async (
+  workspaceId: string,
+  userId: string,
+  data: UpdateWorkspaceInput,
+) => {
+  const membership = await WorkspaceMember.findOne({
+    workspace: workspaceId,
+    user: userId,
+  });
+
+  if (!membership) {
+    throw new AppError("You are not a member of this workspace", 403);
+  }
+
+  if (membership.role !== "owner" && membership.role !== "admin") {
+    throw new AppError("Only workspace owners or admins can rename it", 403);
+  }
+
+  const workspace = await Workspace.findById(workspaceId);
+
+  if (!workspace) {
+    throw new AppError("Workspace not found", 404);
+  }
+
+  // The slug is left alone so existing links keep working.
+  workspace.name = data.name;
+  await workspace.save();
+
+  try {
+    getIO()
+      .to(`workspace:${workspaceId}`)
+      .emit("workspace:updated", { id: workspaceId, name: workspace.name });
+  } catch {
+    // Socket server not initialised.
+  }
+
+  return {
+    id: workspace._id,
+    name: workspace.name,
+    slug: workspace.slug,
   };
 };
 

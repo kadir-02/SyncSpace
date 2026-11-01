@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, MessageSquare, Search, Trash2, UserPlus } from "lucide-react";
+import { LogOut, MessageSquare, Pencil, Search, Trash2, UserPlus } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -13,12 +13,13 @@ import { api } from "@/lib/api";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { startConversation } from "@/store/slices/dmSlice";
-import { toastAdded } from "@/store/slices/uiSlice";
+import { profileOpened, toastAdded } from "@/store/slices/uiSlice";
 import {
   addWorkspaceMember,
   deleteWorkspace,
   leaveWorkspace,
   removeWorkspaceMember,
+  renameWorkspace,
   transferOwnership,
   updateWorkspaceMemberRole,
 } from "@/store/slices/workspaceSlice";
@@ -169,6 +170,8 @@ export default function MembersPage() {
   const status = useAppSelector((state) => state.workspaces.membersStatus[workspaceId]);
 
   const [addOpen, setAddOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<
     | { kind: "remove"; member: WorkspaceMember }
@@ -202,6 +205,18 @@ export default function MembersPage() {
       const conversation = await dispatch(startConversation(userId)).unwrap();
       router.push(`/w/${workspaceId}/dm/${conversation.id}`);
     });
+  };
+
+  const saveRename = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    const ok = await run(
+      "rename",
+      () => dispatch(renameWorkspace({ workspaceId, name: newName.trim() })).unwrap(),
+      "Workspace renamed",
+    );
+
+    if (ok) setRenameOpen(false);
   };
 
   const canRemove = (member: WorkspaceMember) => {
@@ -301,19 +316,26 @@ export default function MembersPage() {
 
               return (
                 <li key={member.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                  <Avatar
-                    id={member.userId}
-                    name={member.name}
-                    src={member.avatar}
-                    size="md"
-                    online={Boolean(online[member.userId])}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-900">
-                      {member.name} {isMe && <span className="text-slate-400">(you)</span>}
-                    </p>
-                    <p className="truncate text-xs text-slate-500">{member.email}</p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => dispatch(profileOpened(member.userId))}
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    aria-label={`View ${member.name}'s profile`}
+                  >
+                    <Avatar
+                      id={member.userId}
+                      name={member.name}
+                      src={member.avatar}
+                      size="md"
+                      online={Boolean(online[member.userId])}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-slate-900">
+                        {member.name} {isMe && <span className="text-slate-400">(you)</span>}
+                      </span>
+                      <span className="block truncate text-xs text-slate-500">{member.email}</span>
+                    </span>
+                  </button>
 
                   {isOwner && !isMe && member.workspaceRole !== "owner" ? (
                     <div className="w-28">
@@ -383,6 +405,23 @@ export default function MembersPage() {
 
         <section className="space-y-3 rounded-xl border border-slate-200 p-5">
           <h2 className="text-sm font-semibold text-slate-900">Workspace</h2>
+          {isAdmin && (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-slate-600">
+                Name: <span className="font-medium text-slate-900">{workspace?.name}</span>
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setNewName(workspace?.name ?? "");
+                  setRenameOpen(true);
+                }}
+              >
+                <Pencil className="h-4 w-4" /> Rename
+              </Button>
+            </div>
+          )}
           {!isOwner && (
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm text-slate-600">Leave this workspace and lose access to its content.</p>
@@ -403,6 +442,41 @@ export default function MembersPage() {
           )}
         </section>
       </div>
+
+      <Modal
+        open={renameOpen}
+        onClose={() => setRenameOpen(false)}
+        title="Rename workspace"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setRenameOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="rename-workspace"
+              loading={busy === "rename"}
+              disabled={newName.trim().length < 2 || newName.trim() === workspace?.name}
+            >
+              Save
+            </Button>
+          </>
+        }
+      >
+        <form id="rename-workspace" onSubmit={saveRename}>
+          <Field label="Workspace name">
+            <Input
+              autoFocus
+              required
+              minLength={2}
+              maxLength={100}
+              value={newName}
+              onChange={(event) => setNewName(event.target.value)}
+            />
+          </Field>
+        </form>
+      </Modal>
 
       <AddMemberModal open={addOpen} workspaceId={workspaceId} onClose={() => setAddOpen(false)} />
 

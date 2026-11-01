@@ -9,6 +9,7 @@ import {
   leaveWorkspace,
   removeWorkspaceMember,
   transferWorkspaceOwnership,
+  updateWorkspace,
   updateWorkspaceMemberRole,
 } from "../services/workspace.service.js";
 import {
@@ -16,6 +17,7 @@ import {
   createWorkspaceSchema,
   transferWorkspaceOwnershipSchema,
   updateWorkspaceMemberRoleSchema,
+  updateWorkspaceSchema,
 } from "../validations/workspace.validation.js";
 import { sendSuccess } from "../utils/api-response.js";
 
@@ -28,6 +30,21 @@ export const createWorkspaceController = async (
   const workspace = await createWorkspace(req.user!.userId, data);
 
   return sendSuccess(res, 201, "Workspace created successfully", workspace);
+};
+
+export const updateWorkspaceController = async (
+  req: Request<{ id: string }>,
+  res: Response,
+) => {
+  const data = updateWorkspaceSchema.parse(req.body);
+
+  const workspace = await updateWorkspace(
+    req.params.id,
+    req.user!.userId,
+    data,
+  );
+
+  return sendSuccess(res, 200, "Workspace updated successfully", workspace);
 };
 
 export const getMyWorkspaces = async (req: Request, res: Response) => {

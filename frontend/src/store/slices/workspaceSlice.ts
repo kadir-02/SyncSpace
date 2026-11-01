@@ -2,6 +2,7 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import { api } from "@/lib/api";
 import type { Workspace, WorkspaceMember, WorkspaceRole } from "@/types";
 import { apiThunk } from "../thunk";
+import { userUpdated } from "../actions";
 
 type LoadStatus = "idle" | "loading" | "ready" | "error";
 
@@ -35,6 +36,16 @@ export const createWorkspace = apiThunk<Workspace, { name: string }>(
 
     return { ...created, role: "owner" as WorkspaceRole };
   },
+);
+
+export const renameWorkspace = apiThunk<
+  { id: string; name: string },
+  { workspaceId: string; name: string }
+>("workspaces/rename", ({ workspaceId, name }) =>
+  api<{ id: string; name: string }>(`/workspaces/${workspaceId}`, {
+    method: "PATCH",
+    body: { name },
+  }),
 );
 
 export const fetchWorkspaceMembers = apiThunk<
@@ -125,6 +136,11 @@ const workspaceSlice = createSlice({
     workspaceRemoved(state, action: PayloadAction<string>) {
       removeWorkspace(state, action.payload);
     },
+    // Fired from the socket when an admin renames a workspace.
+    workspaceRenamed(state, action: PayloadAction<{ id: string; name: string }>) {
+      const workspace = state.items.find((item) => item.id === action.payload.id);
+      if (workspace) workspace.name = action.payload.name;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -165,6 +181,20 @@ const workspaceSlice = createSlice({
           state.members[payload.workspaceId] ?? []
         ).filter((item) => item.userId !== payload.userId);
       })
+      .addCase(renameWorkspace.fulfilled, (state, { payload }) => {
+        const workspace = state.items.find((item) => item.id === payload.id);
+        if (workspace) workspace.name = payload.name;
+      })
+      .addCase(userUpdated, (state, { payload }) => {
+        for (const members of Object.values(state.members)) {
+          for (const member of members) {
+            if (member.userId === payload.id) {
+              member.name = payload.name;
+              member.avatar = payload.avatar ?? undefined;
+            }
+          }
+        }
+      })
       .addCase(leaveWorkspace.fulfilled, (state, { payload }) => {
         removeWorkspace(state, payload);
       })
@@ -174,5 +204,5 @@ const workspaceSlice = createSlice({
   },
 });
 
-export const { setCurrentWorkspace, workspaceRemoved } = workspaceSlice.actions;
+export const { setCurrentWorkspace, workspaceRemoved, workspaceRenamed } = workspaceSlice.actions;
 export default workspaceSlice.reducer;

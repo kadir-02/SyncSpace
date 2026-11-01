@@ -17,6 +17,8 @@ export const sendDirectMessageSchema = z.object({
     .max(5000, "Message cannot exceed 5000 characters"),
 });
 
+export const updateDirectMessageSchema = sendDirectMessageSchema;
+
 export const conversationIdSchema = z.object({
   conversationId: objectIdSchema,
 });
@@ -27,6 +29,10 @@ export const directMessageIdSchema = z.object({
 
 export type CreateConversationInput = z.infer<
   typeof createConversationSchema
+>;
+
+export type UpdateDirectMessageInput = z.infer<
+  typeof updateDirectMessageSchema
 >;
 
 export type SendDirectMessageInput = z.infer<

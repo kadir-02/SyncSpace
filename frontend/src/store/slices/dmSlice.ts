@@ -2,6 +2,7 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import { api } from "@/lib/api";
 import type { Conversation, DirectMessage, Pagination } from "@/types";
 import { apiThunk } from "../thunk";
+import { userUpdated } from "../actions";
 
 interface ConversationMessages {
   items: DirectMessage[]; // oldest -> newest
@@ -54,6 +55,15 @@ const upsertConversation = (state: DmState, conversation: Conversation) => {
 
   if (index === -1) state.conversations.unshift(conversation);
   else state.conversations[index] = { ...state.conversations[index], ...conversation };
+};
+
+// Keeps the sidebar preview right when the newest message is edited.
+const refreshPreview = (state: DmState, message: DirectMessage) => {
+  const conversation = state.conversations.find((item) => item.id === message.conversation);
+
+  if (conversation?.lastMessage?.id === message.id) {
+    conversation.lastMessage.content = message.content;
+  }
 };
 
 const touchConversation = (state: DmState, message: DirectMessage) => {
@@ -110,6 +120,16 @@ export const sendDirectMessage = apiThunk<
   }),
 );
 
+export const editDirectMessage = apiThunk<
+  DirectMessage,
+  { messageId: string; content: string }
+>("dm/edit", ({ messageId, content }) =>
+  api<DirectMessage>(`/dms/messages/${messageId}`, {
+    method: "PATCH",
+    body: { content },
+  }),
+);
+
 export const deleteDirectMessage = apiThunk<
   { messageId: string; conversationId: string },
   { messageId: string; conversationId: string }
@@ -125,6 +145,11 @@ const dmSlice = createSlice({
     dmMessageReceived(state, action: PayloadAction<DirectMessage>) {
       upsertMessage(ensure(state, action.payload.conversation).items, action.payload);
       touchConversation(state, action.payload);
+    },
+    dmMessageUpdated(state, action: PayloadAction<DirectMessage>) {
+      const thread = state.messages[action.payload.conversation];
+      if (thread) upsertMessage(thread.items, action.payload);
+      refreshPreview(state, action.payload);
     },
     dmMessageRemoved(
       state,
@@ -184,6 +209,21 @@ const dmSlice = createSlice({
         upsertMessage(ensure(state, payload.conversation).items, payload);
         touchConversation(state, payload);
       })
+      .addCase(editDirectMessage.fulfilled, (state, { payload }) => {
+        const thread = state.messages[payload.conversation];
+        if (thread) upsertMessage(thread.items, payload);
+        refreshPreview(state, payload);
+      })
+      .addCase(userUpdated, (state, { payload }) => {
+        for (const conversation of state.conversations) {
+          for (const participant of conversation.participants) {
+            if (participant.id === payload.id) {
+              participant.name = payload.name;
+              participant.avatar = payload.avatar ?? undefined;
+            }
+          }
+        }
+      })
       .addCase(deleteDirectMessage.fulfilled, (state, { payload }) => {
         const thread = state.messages[payload.conversationId];
         if (thread) {
@@ -193,5 +233,10 @@ const dmSlice = createSlice({
   },
 });
 
-export const { dmMessageReceived, dmMessageRemoved, conversationAdded } = dmSlice.actions;
+export const {
+  dmMessageReceived,
+  dmMessageUpdated,
+  dmMessageRemoved,
+  conversationAdded,
+} = dmSlice.actions;
 export default dmSlice.reducer;

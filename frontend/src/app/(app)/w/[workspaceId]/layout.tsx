@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, WifiOff } from "lucide-react";
+import { UserProfileModal } from "@/components/features/UserProfileModal";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { FullScreenSpinner } from "@/components/ui/Spinner";
 import { saveLastWorkspace } from "@/lib/storage";
@@ -86,6 +87,8 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
 
         <main className="min-h-0 flex-1">{children}</main>
       </div>
+
+      <UserProfileModal />
     </div>
   );
 }

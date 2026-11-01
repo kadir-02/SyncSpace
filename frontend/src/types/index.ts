@@ -111,6 +111,7 @@ export interface DirectMessage {
   conversation: string;
   sender: UserLite | string;
   content: string;
+  edited?: boolean;
   createdAt: string;
 }
 

@@ -10,6 +10,7 @@ import {
   removeMember,
   transferOwnership,
   updateMemberRole,
+  updateWorkspaceController,
 } from "../controllers/workspace.controller.js";
 import { authMiddleware } from "../middlewares/auth.middleware.js";
 import { asyncHandler } from "../utils/async-handler.js";
@@ -41,6 +42,7 @@ router.patch(
   asyncHandler(transferOwnership),
 );
 
+router.patch("/:id", authMiddleware, asyncHandler(updateWorkspaceController));
 router.delete("/:id", authMiddleware, asyncHandler(deleteWorkspaceController));
 router.get("/:id", authMiddleware, asyncHandler(getWorkspace));
 

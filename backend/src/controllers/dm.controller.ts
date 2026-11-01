@@ -5,12 +5,14 @@ import {
   getDirectMessages,
   sendDirectMessage,
   deleteDirectMessage,
+  updateDirectMessage,
 } from "../services/dm.service.js";
 import {
   createConversationSchema,
   sendDirectMessageSchema,
   conversationIdSchema,
   directMessageIdSchema,
+  updateDirectMessageSchema,
 } from "../validations/dm.validation.js";
 import { sendSuccess } from "../utils/api-response.js";
 import { AppError } from "../utils/app-error.js";
@@ -103,6 +105,31 @@ export const sendDirectMessageController = async (
   emitToConversation(conversationId, participantIds, "dm:message:new", message);
 
   return sendSuccess(res, 201, "Direct message sent successfully", message);
+};
+
+export const updateDirectMessageController = async (
+  req: Request<{ messageId: string }>,
+  res: Response,
+) => {
+  const { messageId } = directMessageIdSchema.parse(req.params);
+  const { content } = updateDirectMessageSchema.parse(req.body);
+
+  const { message, participantIds } = await updateDirectMessage(
+    messageId,
+    req.user!.userId,
+    content,
+  );
+
+  if (message) {
+    emitToConversation(
+      message.conversation.toString(),
+      participantIds,
+      "dm:message:updated",
+      message,
+    );
+  }
+
+  return sendSuccess(res, 200, "Direct message updated successfully", message);
 };
 
 export const deleteDirectMessageController = async (

@@ -163,6 +163,41 @@ export const sendDirectMessage = async (
   return { message: populated, participantIds };
 };
 
+export const updateDirectMessage = async (
+  messageId: string,
+  userId: string,
+  content: string,
+) => {
+  const message = await DirectMessage.findById(messageId);
+
+  if (!message) {
+    throw new AppError("Message not found", 404);
+  }
+
+  if (message.sender.toString() !== userId) {
+    throw new AppError("You can only edit your own messages", 403);
+  }
+
+  const conversation = await checkConversationAccess(
+    message.conversation.toString(),
+    userId,
+  );
+
+  message.content = content;
+  message.edited = true;
+  await message.save();
+
+  const populated = await DirectMessage.findById(message._id).populate(
+    "sender",
+    "name email avatar",
+  );
+
+  return {
+    message: populated,
+    participantIds: conversation.participants.map((id) => id.toString()),
+  };
+};
+
 export const deleteDirectMessage = async (
   messageId: string,
   userId: string,

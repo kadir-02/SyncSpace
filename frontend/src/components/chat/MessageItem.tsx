@@ -5,6 +5,8 @@ import { FileText, Pencil, Trash2 } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Field";
+import { useAppDispatch } from "@/store/hooks";
+import { profileOpened } from "@/store/slices/uiSlice";
 import { linkify } from "@/lib/linkify";
 import { formatBytes, formatTime, isImage } from "@/lib/utils";
 import type { Attachment } from "@/types";
@@ -62,6 +64,7 @@ function AttachmentView({ attachment }: { attachment: Attachment }) {
 }
 
 export function MessageItem({ message, grouped, isOwn, online, onEdit, onDelete }: MessageItemProps) {
+  const dispatch = useAppDispatch();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
   const [saving, setSaving] = useState(false);
@@ -89,6 +92,10 @@ export function MessageItem({ message, grouped, isOwn, online, onEdit, onDelete 
     }
   };
 
+  const openProfile = () => {
+    if (message.sender.id) dispatch(profileOpened(message.sender.id));
+  };
+
   const canEdit = isOwn && Boolean(onEdit) && message.content.length > 0;
 
   return (
@@ -99,20 +106,28 @@ export function MessageItem({ message, grouped, isOwn, online, onEdit, onDelete 
             {formatTime(message.createdAt)}
           </span>
         ) : (
-          <Avatar
-            id={message.sender.id}
-            name={message.sender.name}
-            src={message.sender.avatar}
-            size="md"
-            online={online}
-          />
+          <button type="button" onClick={openProfile} aria-label={`View ${message.sender.name}'s profile`}>
+            <Avatar
+              id={message.sender.id}
+              name={message.sender.name}
+              src={message.sender.avatar}
+              size="md"
+              online={online}
+            />
+          </button>
         )}
       </div>
 
       <div className="min-w-0 flex-1 pb-1">
         {!grouped && (
           <div className="flex items-baseline gap-2 pt-0.5">
-            <span className="text-sm font-semibold text-slate-900">{message.sender.name}</span>
+            <button
+              type="button"
+              onClick={openProfile}
+              className="text-sm font-semibold text-slate-900 hover:underline"
+            >
+              {message.sender.name}
+            </button>
             <time className="text-xs text-slate-400" dateTime={message.createdAt}>
               {formatTime(message.createdAt)}
             </time>
@@ -165,12 +180,12 @@ export function MessageItem({ message, grouped, isOwn, online, onEdit, onDelete 
       </div>
 
       {isOwn && !editing && (onDelete || canEdit) && (
-        <div className="absolute -top-3 right-5 hidden items-center rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm group-hover:flex group-focus-within:flex">
+        <div className="absolute -top-3 right-5 hidden items-center rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm group-hover:flex group-focus-within:flex pointer-coarse:flex">
           {canEdit && (
             <button
               type="button"
               onClick={startEdit}
-              className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+              className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 pointer-coarse:p-2.5"
               aria-label="Edit message"
             >
               <Pencil className="h-3.5 w-3.5" />
@@ -180,7 +195,7 @@ export function MessageItem({ message, grouped, isOwn, online, onEdit, onDelete 
             <button
               type="button"
               onClick={() => onDelete(message.id)}
-              className="rounded-md p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600"
+              className="rounded-md p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600 pointer-coarse:p-2.5"
               aria-label="Delete message"
             >
               <Trash2 className="h-3.5 w-3.5" />

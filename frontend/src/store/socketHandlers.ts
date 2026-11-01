@@ -19,6 +19,7 @@ import {
   conversationAdded,
   dmMessageReceived,
   dmMessageRemoved,
+  dmMessageUpdated,
   fetchDirectMessages,
 } from "./slices/dmSlice";
 import {
@@ -42,9 +43,10 @@ import {
   userWentOffline,
 } from "./slices/presenceSlice";
 import { channelRemoved } from "./slices/channelSlice";
-import { fetchWorkspaces, workspaceRemoved } from "./slices/workspaceSlice";
+import { fetchWorkspaces, workspaceRemoved, workspaceRenamed } from "./slices/workspaceSlice";
 import { socketStatusChanged, toastAdded } from "./slices/uiSlice";
 import { loadGlobalData, loadWorkspaceData } from "./workspaceThunks";
+import { userUpdated } from "./actions";
 
 const TYPING_TTL_MS = 5000;
 
@@ -163,6 +165,10 @@ export function bindSocketEvents(socket: Socket, { dispatch, getState }: Store) 
     dispatch(dmMessageReceived(normalize<DirectMessage>(raw))),
   );
 
+  socket.on("dm:message:updated", (raw: unknown) =>
+    dispatch(dmMessageUpdated(normalize<DirectMessage>(raw))),
+  );
+
   socket.on(
     "dm:message:deleted",
     (data: { messageId: string; conversationId: string }) =>
@@ -237,6 +243,12 @@ export function bindSocketEvents(socket: Socket, { dispatch, getState }: Store) 
   // ---- structure ----------------------------------------------------------
   socket.on("channel:deleted", (data: { channelId: string }) =>
     dispatch(channelRemoved(data.channelId)),
+  );
+  socket.on("workspace:updated", (data: { id: string; name: string }) =>
+    dispatch(workspaceRenamed(data)),
+  );
+  socket.on("user:updated", (data: { id: string; name: string; avatar?: string | null }) =>
+    dispatch(userUpdated(data)),
   );
   socket.on("workspace:deleted", (data: { workspaceId: string }) =>
     dispatch(workspaceRemoved(data.workspaceId)),

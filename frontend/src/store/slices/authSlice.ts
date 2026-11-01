@@ -4,6 +4,7 @@ import { clearToken, readToken, saveToken } from "@/lib/storage";
 import { disconnectSocket } from "@/lib/socket";
 import type { User } from "@/types";
 import { apiThunk } from "../thunk";
+import { userUpdated } from "../actions";
 
 type AuthStatus = "idle" | "loading" | "authenticated" | "unauthenticated";
 
@@ -75,6 +76,29 @@ export const bootstrapSession = apiThunk<{ user: User; token: string } | null>(
   },
 );
 
+export const updateProfile = apiThunk<User, { name: string }>(
+  "auth/updateProfile",
+  ({ name }) => api<User>("/users/me", { method: "PATCH", body: { name } }),
+);
+
+export const uploadAvatar = apiThunk<User, File>("auth/uploadAvatar", (file) => {
+  const formData = new FormData();
+  formData.append("avatar", file);
+
+  return api<User>("/users/me/avatar", { method: "POST", formData });
+});
+
+export const removeAvatar = apiThunk<User>("auth/removeAvatar", () =>
+  api<User>("/users/me/avatar", { method: "DELETE" }),
+);
+
+export const changePassword = apiThunk<
+  void,
+  { currentPassword: string; newPassword: string }
+>("auth/changePassword", async (body) => {
+  await api("/users/me/password", { method: "PATCH", body });
+});
+
 // Clears credentials and tears down the socket. The root reducer resets all
 // slices when it sees `auth/loggedOut`.
 export const logout = apiThunk<void>("auth/logout", async (_arg, { dispatch }) => {
@@ -132,6 +156,23 @@ const authSlice = createSlice({
         state.status = "unauthenticated";
         state.user = null;
         state.token = null;
+      })
+      // The server returns the full user, so replace rather than merge
+      // (a removed avatar must actually disappear).
+      .addCase(updateProfile.fulfilled, (state, { payload }) => {
+        state.user = payload;
+      })
+      .addCase(uploadAvatar.fulfilled, (state, { payload }) => {
+        state.user = payload;
+      })
+      .addCase(removeAvatar.fulfilled, (state, { payload }) => {
+        state.user = payload;
+      })
+      .addCase(userUpdated, (state, { payload }) => {
+        if (state.user?.id === payload.id) {
+          state.user.name = payload.name;
+          state.user.avatar = payload.avatar ?? undefined;
+        }
       });
   },
 });

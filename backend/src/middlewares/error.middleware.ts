@@ -33,7 +33,7 @@ export const errorMiddleware: ErrorRequestHandler = (
 
     return res.status(tooLarge ? 413 : 400).json({
       success: false,
-      message: tooLarge ? "File is too large (max 10 MB)" : error.message,
+      message: tooLarge ? "File is too large" : error.message,
     });
   }
 
