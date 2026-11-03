@@ -13,6 +13,7 @@ interface UploadFileParams {
   userId: string;
   workspaceId: string;
   channelId?: string;
+  directMessage?: boolean;
 }
 
 type CloudinaryResourceType = "image" | "video" | "raw";
@@ -95,6 +96,7 @@ export const uploadFile = async ({
   userId,
   workspaceId,
   channelId,
+  directMessage,
 }: UploadFileParams) => {
   await checkWorkspaceAccess(workspaceId, userId);
 
@@ -150,6 +152,7 @@ export const uploadFile = async ({
       uploadedBy: userId,
       workspace: workspaceId,
       ...(channelId ? { channel: channelId } : {}),
+      ...(directMessage ? { isDirectMessage: true } : {}),
     });
 
     return savedFile;
@@ -197,8 +200,9 @@ export const getWorkspaceFiles = async (
   const filter = {
     workspace: workspaceId,
     $or: [
-      { channel: null },
-      { uploadedBy: userId },
+      // Workspace-level files; files sent in DMs are private to the conversation.
+      { channel: null, isDirectMessage: { $ne: true } },
+      { uploadedBy: userId, isDirectMessage: { $ne: true } },
       { channel: { $in: accessibleChannelIds } },
     ],
   };

@@ -94,12 +94,13 @@ export const sendDirectMessageController = async (
   res: Response,
 ) => {
   const { conversationId } = conversationIdSchema.parse(req.params);
-  const { content } = sendDirectMessageSchema.parse(req.body);
+  const { content, attachmentIds } = sendDirectMessageSchema.parse(req.body);
 
   const { message, participantIds } = await sendDirectMessage(
     conversationId,
     req.user!.userId,
     content,
+    attachmentIds,
   );
 
   emitToConversation(conversationId, participantIds, "dm:message:new", message);

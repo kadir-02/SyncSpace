@@ -5,7 +5,7 @@ import { Loader2, Paperclip, SendHorizonal, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn, formatBytes, UPLOAD_ACCEPT, validateUpload } from "@/lib/utils";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { pendingAttachmentRemoved, uploadFile } from "@/store/slices/fileSlice";
+import { pendingAttachmentRemoved, pendingKeyFor, uploadFile } from "@/store/slices/fileSlice";
 import { toastAdded } from "@/store/slices/uiSlice";
 import type { UploadedFile } from "@/types";
 
@@ -14,8 +14,8 @@ interface ComposerProps {
   onSend: (content: string, attachmentIds: string[]) => Promise<void>;
   onTypingStart?: () => void;
   onTypingStop?: () => void;
-  // Enables the attachment button (channels only).
-  attachments?: { workspaceId: string; channelId: string };
+  // Enables the attachment button (channels and direct messages).
+  attachments?: { workspaceId: string; channelId?: string; conversationId?: string };
 }
 
 const TYPING_IDLE_MS = 2500;
@@ -37,12 +37,12 @@ export function Composer({
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSent = useRef(0);
 
-  const channelId = attachments?.channelId;
+  const pendingKey = attachments ? pendingKeyFor(attachments) : undefined;
   const pending = useAppSelector((state) =>
-    channelId ? (state.files.pending[channelId] ?? NO_FILES) : NO_FILES,
+    pendingKey ? (state.files.pending[pendingKey] ?? NO_FILES) : NO_FILES,
   );
   const uploading = useAppSelector((state) =>
-    channelId ? Boolean(state.files.uploading[channelId]) : false,
+    pendingKey ? Boolean(state.files.uploading[pendingKey]) : false,
   );
 
   const stopTyping = useCallback(() => {
@@ -135,6 +135,7 @@ export function Composer({
         uploadFile({
           workspaceId: attachments.workspaceId,
           channelId: attachments.channelId,
+          conversationId: attachments.conversationId,
           file,
         }),
       ).unwrap();
@@ -170,8 +171,8 @@ export function Composer({
                 <button
                   type="button"
                   onClick={() =>
-                    channelId &&
-                    dispatch(pendingAttachmentRemoved({ channelId, fileId: file.id }))
+                    pendingKey &&
+                    dispatch(pendingAttachmentRemoved({ key: pendingKey, fileId: file.id }))
                   }
                   className="text-slate-400 hover:text-slate-700"
                   aria-label={`Remove ${file.originalName}`}

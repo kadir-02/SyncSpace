@@ -5,6 +5,7 @@ export interface IDirectMessage {
   conversation: Types.ObjectId;
   sender: Types.ObjectId;
   content: string;
+  attachments: Types.ObjectId[];
   edited: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -24,10 +25,20 @@ const directMessageSchema = new Schema<IDirectMessage>(
     },
     content: {
       type: String,
-      required: true,
+      // Content may be empty only when the message carries attachments.
+      required: function (this: { attachments?: unknown[] }) {
+        return !this.attachments || this.attachments.length === 0;
+      },
+      default: "",
       trim: true,
       maxlength: 5000,
     },
+    attachments: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "File",
+      },
+    ],
     edited: {
       type: Boolean,
       default: false,

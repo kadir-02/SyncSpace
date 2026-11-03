@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 import type { Pagination, UploadedFile } from "@/types";
 import { apiThunk } from "../thunk";
 import { sendMessage } from "./messageSlice";
+import { sendDirectMessage } from "./dmSlice";
 
 interface WorkspaceFiles {
   items: UploadedFile[];
@@ -14,14 +15,18 @@ interface WorkspaceFiles {
 
 interface FileState {
   byWorkspace: Record<string, WorkspaceFiles>;
-  // Files uploaded from the composer, waiting to be sent: channelId -> files
+  // Files uploaded from a composer, waiting to be sent. Keyed by channel id,
+  // or "dm:<conversationId>" for direct messages.
   pending: Record<string, UploadedFile[]>;
-  uploading: Record<string, boolean>; // channelId or workspaceId -> in flight
+  uploading: Record<string, boolean>; // pending key (or workspaceId) -> in flight
 }
 
 const initialState: FileState = { byWorkspace: {}, pending: {}, uploading: {} };
 
 const PAGE_SIZE = 24;
+
+export const pendingKeyFor = (target: { channelId?: string; conversationId?: string }) =>
+  target.channelId ?? (target.conversationId ? `dm:${target.conversationId}` : undefined);
 
 export const fetchFiles = apiThunk<
   { workspaceId: string; page: number; files: UploadedFile[]; pagination: Pagination },
@@ -37,12 +42,14 @@ export const fetchFiles = apiThunk<
 
 export const uploadFile = apiThunk<
   UploadedFile,
-  { workspaceId: string; channelId?: string; file: File }
->("files/upload", ({ workspaceId, channelId, file }) => {
+  { workspaceId: string; channelId?: string; conversationId?: string; file: File }
+>("files/upload", ({ workspaceId, channelId, conversationId, file }) => {
   const formData = new FormData();
 
   formData.append("workspaceId", workspaceId);
   if (channelId) formData.append("channelId", channelId);
+  // DM files stay out of the workspace-wide Files page.
+  if (conversationId) formData.append("purpose", "dm");
   // Multer reads the file field, so append it last.
   formData.append("file", file);
 
@@ -77,10 +84,10 @@ const fileSlice = createSlice({
   reducers: {
     pendingAttachmentRemoved(
       state,
-      action: PayloadAction<{ channelId: string; fileId: string }>,
+      action: PayloadAction<{ key: string; fileId: string }>,
     ) {
-      state.pending[action.payload.channelId] = (
-        state.pending[action.payload.channelId] ?? []
+      state.pending[action.payload.key] = (
+        state.pending[action.payload.key] ?? []
       ).filter((file) => file.id !== action.payload.fileId);
     },
   },
@@ -95,12 +102,15 @@ const fileSlice = createSlice({
       .addCase(fetchFiles.fulfilled, (state, { payload }) => {
         const entry = ensure(state, payload.workspaceId);
 
+        // Files sent in DMs belong to their conversation, not the workspace list.
+        const files = payload.files.filter((file) => !file.isDirectMessage);
+
         entry.items =
           payload.page === 1
-            ? payload.files
+            ? files
             : [
                 ...entry.items,
-                ...payload.files.filter(
+                ...files.filter(
                   (file) => !entry.items.some((existing) => existing.id === file.id),
                 ),
               ];
@@ -115,21 +125,23 @@ const fileSlice = createSlice({
         entry.loadingMore = false;
       })
       .addCase(uploadFile.pending, (state, { meta }) => {
-        state.uploading[meta.arg.channelId ?? meta.arg.workspaceId] = true;
+        state.uploading[pendingKeyFor(meta.arg) ?? meta.arg.workspaceId] = true;
       })
       .addCase(uploadFile.fulfilled, (state, { payload, meta }) => {
-        const { channelId, workspaceId } = meta.arg;
-        state.uploading[channelId ?? workspaceId] = false;
+        const { conversationId, workspaceId } = meta.arg;
+        const key = pendingKeyFor(meta.arg);
+        state.uploading[key ?? workspaceId] = false;
 
-        if (channelId) {
-          (state.pending[channelId] ??= []).push(payload);
+        if (key) {
+          (state.pending[key] ??= []).push(payload);
         }
 
+        // Private DM files never appear in the shared workspace list.
         const entry = state.byWorkspace[workspaceId];
-        if (entry) entry.items.unshift(payload);
+        if (entry && !conversationId) entry.items.unshift(payload);
       })
       .addCase(uploadFile.rejected, (state, { meta }) => {
-        state.uploading[meta.arg.channelId ?? meta.arg.workspaceId] = false;
+        state.uploading[pendingKeyFor(meta.arg) ?? meta.arg.workspaceId] = false;
       })
       .addCase(deleteFile.fulfilled, (state, { payload }) => {
         const entry = state.byWorkspace[payload.workspaceId];
@@ -138,6 +150,9 @@ const fileSlice = createSlice({
       // Attachments are consumed once their message is sent.
       .addCase(sendMessage.fulfilled, (state, { meta }) => {
         delete state.pending[meta.arg.channelId];
+      })
+      .addCase(sendDirectMessage.fulfilled, (state, { meta }) => {
+        delete state.pending[`dm:${meta.arg.conversationId}`];
       });
   },
 });

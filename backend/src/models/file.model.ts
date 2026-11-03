@@ -10,6 +10,7 @@ export interface IFile {
   uploadedBy: Types.ObjectId;
   workspace: Types.ObjectId;
   channel?: Types.ObjectId;
+  isDirectMessage?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,6 +53,10 @@ const fileSchema = new Schema<IFile>(
       type: Schema.Types.ObjectId,
       ref: "Workspace",
       required: true,
+    },
+    isDirectMessage: {
+      type: Boolean,
+      default: false,
     },
     channel: {
       type: Schema.Types.ObjectId,

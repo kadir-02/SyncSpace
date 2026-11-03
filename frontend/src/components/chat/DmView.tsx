@@ -73,6 +73,7 @@ export function DmView({ conversationId }: { conversationId: string }) {
         sender: resolve(message.sender),
         content: message.content,
         edited: message.edited,
+        attachments: message.attachments ?? [],
       })),
     [thread?.items, resolve],
   );
@@ -176,10 +177,13 @@ export function DmView({ conversationId }: { conversationId: string }) {
       <Composer
         key={conversationId}
         placeholder={`Message ${other?.name ?? ""}`}
+        attachments={{ workspaceId, conversationId }}
         onTypingStart={() => emitTyping("dm:typing:start")}
         onTypingStop={() => emitTyping("dm:typing:stop")}
-        onSend={async (content) => {
-          await dispatch(sendDirectMessage({ conversationId, content })).unwrap();
+        onSend={async (content, attachmentIds) => {
+          await dispatch(
+            sendDirectMessage({ conversationId, content, attachmentIds }),
+          ).unwrap();
         }}
       />
     </section>

@@ -112,11 +112,11 @@ export const fetchDirectMessages = apiThunk<
 
 export const sendDirectMessage = apiThunk<
   DirectMessage,
-  { conversationId: string; content: string }
->("dm/send", ({ conversationId, content }) =>
+  { conversationId: string; content: string; attachmentIds?: string[] }
+>("dm/send", ({ conversationId, content, attachmentIds }) =>
   api<DirectMessage>(`/dms/conversations/${conversationId}/messages`, {
     method: "POST",
-    body: { content },
+    body: { content, attachmentIds: attachmentIds ?? [] },
   }),
 );
 

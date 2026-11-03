@@ -9,15 +9,31 @@ export const createConversationSchema = z.object({
   recipientId: objectIdSchema,
 });
 
-export const sendDirectMessageSchema = z.object({
+// A message needs text, attachments, or both.
+export const sendDirectMessageSchema = z
+  .object({
+    content: z
+      .string()
+      .trim()
+      .max(5000, "Message cannot exceed 5000 characters")
+      .default(""),
+    attachmentIds: z
+      .array(objectIdSchema)
+      .max(5, "You can attach up to 5 files")
+      .default([]),
+  })
+  .refine((data) => data.content.length > 0 || data.attachmentIds.length > 0, {
+    message: "Message cannot be empty",
+    path: ["content"],
+  });
+
+export const updateDirectMessageSchema = z.object({
   content: z
     .string()
     .trim()
     .min(1, "Message cannot be empty")
     .max(5000, "Message cannot exceed 5000 characters"),
 });
-
-export const updateDirectMessageSchema = sendDirectMessageSchema;
 
 export const conversationIdSchema = z.object({
   conversationId: objectIdSchema,

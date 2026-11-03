@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { Conversation } from "../models/conversation.model.js";
 import { DirectMessage } from "../models/direct-message.model.js";
+import { File } from "../models/file.model.js";
 import { User } from "../models/user.model.js";
 import { AppError } from "../utils/app-error.js";
 import { getIO } from "../config/socket.js";
@@ -99,6 +100,7 @@ export const getDirectMessages = async (
   const [messages, total] = await Promise.all([
     DirectMessage.find({ conversation: conversationId })
       .populate("sender", "name email avatar")
+      .populate("attachments", "originalName url mimeType size")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit),
@@ -116,17 +118,36 @@ export const getDirectMessages = async (
   };
 };
 
+// Attachments must be the sender's own uploads and not tied to a channel.
+const validateAttachments = async (userId: string, attachmentIds: string[]) => {
+  if (attachmentIds.length === 0) return;
+
+  const files = await File.find({
+    _id: { $in: attachmentIds },
+    uploadedBy: userId,
+  }).select("channel");
+
+  if (files.length !== attachmentIds.length || files.some((file) => file.channel)) {
+    throw new AppError("One or more attachments are invalid", 400);
+  }
+};
+
 export const sendDirectMessage = async (
   conversationId: string,
   userId: string,
   content: string,
+  attachmentIds: string[] = [],
 ) => {
   const conversation = await checkConversationAccess(conversationId, userId);
+
+  const uniqueAttachmentIds = Array.from(new Set(attachmentIds));
+  await validateAttachments(userId, uniqueAttachmentIds);
 
   const message = await DirectMessage.create({
     conversation: conversationId,
     sender: userId,
     content,
+    attachments: uniqueAttachmentIds,
   });
 
   conversation.lastMessage = message._id;
@@ -145,7 +166,10 @@ export const sendDirectMessage = async (
             sender: userId,
             type: "direct_message",
             title: "New direct message",
-            message: content.slice(0, NOTIFICATION_PREVIEW_LENGTH),
+            message: (content || "Sent an attachment").slice(
+              0,
+              NOTIFICATION_PREVIEW_LENGTH,
+            ),
             resourceId: conversationId,
             resourceType: "Conversation",
           }),
@@ -155,10 +179,9 @@ export const sendDirectMessage = async (
     console.error("DM notification failed:", error);
   }
 
-  const populated = await DirectMessage.findById(message._id).populate(
-    "sender",
-    "name email avatar",
-  );
+  const populated = await DirectMessage.findById(message._id)
+    .populate("sender", "name email avatar")
+    .populate("attachments", "originalName url mimeType size");
 
   return { message: populated, participantIds };
 };
@@ -187,10 +210,9 @@ export const updateDirectMessage = async (
   message.edited = true;
   await message.save();
 
-  const populated = await DirectMessage.findById(message._id).populate(
-    "sender",
-    "name email avatar",
-  );
+  const populated = await DirectMessage.findById(message._id)
+    .populate("sender", "name email avatar")
+    .populate("attachments", "originalName url mimeType size");
 
   return {
     message: populated,

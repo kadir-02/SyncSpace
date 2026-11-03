@@ -16,16 +16,22 @@ export const uploadFileController = async (req: Request, res: Response) => {
     throw new AppError("Please select a file to upload", 400);
   }
 
-  const { workspaceId, channelId } = uploadFileSchema.parse({
+  const { workspaceId, channelId, purpose } = uploadFileSchema.parse({
     workspaceId: req.body.workspaceId,
     ...(req.body.channelId ? { channelId: req.body.channelId } : {}),
+    ...(req.body.purpose ? { purpose: req.body.purpose } : {}),
   });
+
+  if (purpose === "dm" && channelId) {
+    throw new AppError("A direct message file cannot belong to a channel", 400);
+  }
 
   const file = await uploadFile({
     file: req.file,
     userId: req.user!.userId,
     workspaceId,
     ...(channelId ? { channelId } : {}),
+    ...(purpose === "dm" ? { directMessage: true } : {}),
   });
 
   return sendSuccess(res, 201, "File uploaded successfully", file);

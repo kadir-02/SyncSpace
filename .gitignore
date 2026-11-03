@@ -60,5 +60,3 @@ uploads/
 *.db
 *.sqlite
 *.sqlite3
-
-/backend_backup/

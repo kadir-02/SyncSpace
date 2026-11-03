@@ -78,6 +78,7 @@ export interface Attachment {
 export interface UploadedFile extends Attachment {
   workspace?: string;
   channel?: string;
+  isDirectMessage?: boolean;
   uploadedBy?: UserLite | string;
   createdAt?: string;
 }
@@ -111,6 +112,7 @@ export interface DirectMessage {
   conversation: string;
   sender: UserLite | string;
   content: string;
+  attachments?: Attachment[];
   edited?: boolean;
   createdAt: string;
 }
