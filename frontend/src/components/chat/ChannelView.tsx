@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Hash, Lock, Search, Settings } from "lucide-react";
+import { Hash, Lock, Search, Settings, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FullScreenSpinner } from "@/components/ui/Spinner";
@@ -21,6 +21,7 @@ import {
 } from "@/store/slices/messageSlice";
 import { activeChatSet, toastAdded } from "@/store/slices/uiSlice";
 import { ChannelSettingsModal } from "./ChannelSettingsModal";
+import { ChannelSummaryPanel } from "./ChannelSummaryPanel";
 import { Composer } from "./Composer";
 import { MessageFeed } from "./MessageFeed";
 import type { FeedMessage } from "./MessageItem";
@@ -43,9 +44,10 @@ export function ChannelView({ channelId }: { channelId: string }) {
     );
   });
 
-  // Remember which channel the search panel was opened for so it closes on navigation.
-  const [searchFor, setSearchFor] = useState<string | null>(null);
-  const searchOpen = searchFor === channelId;
+  // Side panel (search or AI summary), remembered with its channel so it closes on navigation.
+  const [panel, setPanel] = useState<{ type: "search" | "summary"; channelId: string } | null>(null);
+  const searchOpen = panel?.type === "search" && panel.channelId === channelId;
+  const summaryOpen = panel?.type === "summary" && panel.channelId === channelId;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const markedIds = useRef<Set<string>>(new Set());
 
@@ -136,9 +138,18 @@ export function ChannelView({ channelId }: { channelId: string }) {
             )}
           </div>
           <Button
+            variant={summaryOpen ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setPanel(summaryOpen ? null : { type: "summary", channelId })}
+            aria-label="AI summary"
+            title="AI summary"
+          >
+            <Sparkles className="h-4 w-4 text-indigo-600" />
+          </Button>
+          <Button
             variant={searchOpen ? "secondary" : "ghost"}
             size="sm"
-            onClick={() => setSearchFor(searchOpen ? null : channelId)}
+            onClick={() => setPanel(searchOpen ? null : { type: "search", channelId })}
             aria-label="Search messages"
           >
             <Search className="h-4 w-4" />
@@ -205,7 +216,17 @@ export function ChannelView({ channelId }: { channelId: string }) {
 
       {searchOpen && (
         <div className="absolute inset-0 z-20 sm:static sm:inset-auto">
-          <SearchPanel channelId={channelId} onClose={() => setSearchFor(null)} />
+          <SearchPanel channelId={channelId} onClose={() => setPanel(null)} />
+        </div>
+      )}
+
+      {summaryOpen && (
+        <div className="absolute inset-0 z-20 sm:static sm:inset-auto">
+          <ChannelSummaryPanel
+            channelId={channelId}
+            channelName={channel.name}
+            onClose={() => setPanel(null)}
+          />
         </div>
       )}
 

@@ -4,6 +4,7 @@ export interface IWorkspace extends Document {
   name: string;
   slug: string;
   owner: mongoose.Types.ObjectId;
+  aiEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +31,11 @@ const workspaceSchema = new Schema<IWorkspace>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
+    },
+    // AI features send messages to a third-party provider, so admins opt in.
+    aiEnabled: {
+      type: Boolean,
+      default: false,
     },
   },
   {

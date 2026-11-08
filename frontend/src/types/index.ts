@@ -17,6 +17,8 @@ export interface Workspace {
   name: string;
   slug: string;
   role: WorkspaceRole;
+  // Admin opt-in: AI features send messages to a third-party provider.
+  aiEnabled?: boolean;
   createdAt?: string;
 }
 
@@ -157,3 +159,29 @@ export type ActiveChat =
   | { type: "channel"; id: string }
   | { type: "dm"; id: string }
   | null;
+
+export interface AiStatus {
+  configured: boolean;
+  model: string | null;
+  maxRangeDays: number;
+}
+
+export interface ChannelSummary {
+  overview: string;
+  discussions: { topic: string; summary: string; participants: string[] }[];
+  decisions: { decision: string; madeBy?: string }[];
+  pendingQuestions: { question: string; askedBy?: string }[];
+  actionItems: { task: string; owner?: string; due?: string }[];
+}
+
+export interface ChannelSummaryResult {
+  summary: ChannelSummary;
+  meta: {
+    totalMessages: number;
+    includedMessages: number;
+    from: string;
+    to: string;
+    cached: boolean;
+    model: string;
+  };
+}

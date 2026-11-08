@@ -10,6 +10,7 @@ import { Field, Input, Select } from "@/components/ui/Field";
 import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { startConversation } from "@/store/slices/dmSlice";
@@ -20,6 +21,7 @@ import {
   leaveWorkspace,
   removeWorkspaceMember,
   renameWorkspace,
+  setWorkspaceAi,
   transferOwnership,
   updateWorkspaceMemberRole,
 } from "@/store/slices/workspaceSlice";
@@ -206,6 +208,15 @@ export default function MembersPage() {
       router.push(`/w/${workspaceId}/dm/${conversation.id}`);
     });
   };
+
+  const aiStatus = useAppSelector((state) => state.ai.status);
+
+  const toggleAi = (enabled: boolean) =>
+    run(
+      "ai",
+      () => dispatch(setWorkspaceAi({ workspaceId, aiEnabled: enabled })).unwrap(),
+      enabled ? "AI features enabled" : "AI features turned off",
+    );
 
   const saveRename = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -420,6 +431,41 @@ export default function MembersPage() {
               >
                 <Pencil className="h-4 w-4" /> Rename
               </Button>
+            </div>
+          )}
+          {isAdmin && (
+            <div className="flex items-start justify-between gap-4 border-t border-slate-100 pt-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-slate-900">AI features</p>
+                <p className="mt-0.5 text-sm text-slate-600">
+                  Lets members summarize channels. The selected messages are sent to the server&apos;s AI
+                  provider, so only turn this on if your team is comfortable with that.
+                </p>
+                {aiStatus && !aiStatus.configured && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    No AI provider is configured on the server yet (set AI_API_KEY in the backend).
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={Boolean(workspace?.aiEnabled)}
+                aria-label="AI features"
+                disabled={busy === "ai"}
+                onClick={() => toggleAi(!workspace?.aiEnabled)}
+                className={cn(
+                  "relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60",
+                  workspace?.aiEnabled ? "bg-indigo-600" : "bg-slate-300",
+                )}
+              >
+                <span
+                  className={cn(
+                    "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all",
+                    workspace?.aiEnabled ? "left-[22px]" : "left-0.5",
+                  )}
+                />
+              </button>
             </div>
           )}
           {!isOwner && (

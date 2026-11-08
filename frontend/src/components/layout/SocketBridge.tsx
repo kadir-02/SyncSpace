@@ -5,6 +5,7 @@ import { connectSocket, disconnectSocket, getSocket } from "@/lib/socket";
 import { useAppDispatch, useAppSelector, useAppStore } from "@/store/hooks";
 import { bindSocketEvents } from "@/store/socketHandlers";
 import { socketStatusChanged } from "@/store/slices/uiSlice";
+import { fetchAiStatus } from "@/store/slices/aiSlice";
 import { fetchWorkspaces } from "@/store/slices/workspaceSlice";
 import { loadGlobalData } from "@/store/workspaceThunks";
 
@@ -28,6 +29,7 @@ export function SocketBridge() {
 
     dispatch(fetchWorkspaces());
     dispatch(loadGlobalData());
+    dispatch(fetchAiStatus());
 
     return () => {
       unbind();

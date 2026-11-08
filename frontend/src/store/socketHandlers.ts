@@ -244,7 +244,7 @@ export function bindSocketEvents(socket: Socket, { dispatch, getState }: Store) 
   socket.on("channel:deleted", (data: { channelId: string }) =>
     dispatch(channelRemoved(data.channelId)),
   );
-  socket.on("workspace:updated", (data: { id: string; name: string }) =>
+  socket.on("workspace:updated", (data: { id: string; name: string; aiEnabled?: boolean }) =>
     dispatch(workspaceRenamed(data)),
   );
   socket.on("user:updated", (data: { id: string; name: string; avatar?: string | null }) =>

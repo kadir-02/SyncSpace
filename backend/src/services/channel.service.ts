@@ -4,6 +4,7 @@ import { ChannelMember } from "../models/channel-member.model.js";
 import { Message } from "../models/message.model.js";
 import { MessageRead } from "../models/message-read.model.js";
 import { Notification } from "../models/notification.model.js";
+import { AiSummary } from "../models/ai-summary.model.js";
 import { Team } from "../models/team.model.js";
 import { TeamMember } from "../models/team-member.model.js";
 import { WorkspaceMember } from "../models/workspace-member.model.js";
@@ -33,6 +34,7 @@ export const deleteChannelsCascade = async (channelIds: Types.ObjectId[]) => {
     MessageRead.deleteMany({ channel: { $in: channelIds } }),
     Message.deleteMany({ channel: { $in: channelIds } }),
     Notification.deleteMany({ channel: { $in: channelIds } }),
+    AiSummary.deleteMany({ channel: { $in: channelIds } }),
     Channel.deleteMany({ _id: { $in: channelIds } }),
   ]);
 

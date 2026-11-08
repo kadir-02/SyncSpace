@@ -14,6 +14,7 @@ import unread from "./slices/unreadSlice";
 import presence from "./slices/presenceSlice";
 import files from "./slices/fileSlice";
 import ui from "./slices/uiSlice";
+import ai from "./slices/aiSlice";
 
 const appReducer = combineReducers({
   auth,
@@ -27,6 +28,7 @@ const appReducer = combineReducers({
   presence,
   files,
   ui,
+  ai,
 });
 
 // Signing out wipes every slice so no data leaks between accounts.

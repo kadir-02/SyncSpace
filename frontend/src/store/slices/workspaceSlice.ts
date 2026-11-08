@@ -48,6 +48,16 @@ export const renameWorkspace = apiThunk<
   }),
 );
 
+export const setWorkspaceAi = apiThunk<
+  { id: string; aiEnabled: boolean },
+  { workspaceId: string; aiEnabled: boolean }
+>("workspaces/setAi", ({ workspaceId, aiEnabled }) =>
+  api<{ id: string; aiEnabled: boolean }>(`/workspaces/${workspaceId}`, {
+    method: "PATCH",
+    body: { aiEnabled },
+  }),
+);
+
 export const fetchWorkspaceMembers = apiThunk<
   { workspaceId: string; members: WorkspaceMember[] },
   string
@@ -137,9 +147,16 @@ const workspaceSlice = createSlice({
       removeWorkspace(state, action.payload);
     },
     // Fired from the socket when an admin renames a workspace.
-    workspaceRenamed(state, action: PayloadAction<{ id: string; name: string }>) {
+    workspaceRenamed(
+      state,
+      action: PayloadAction<{ id: string; name: string; aiEnabled?: boolean }>,
+    ) {
       const workspace = state.items.find((item) => item.id === action.payload.id);
-      if (workspace) workspace.name = action.payload.name;
+      if (!workspace) return;
+      workspace.name = action.payload.name;
+      if (action.payload.aiEnabled !== undefined) {
+        workspace.aiEnabled = action.payload.aiEnabled;
+      }
     },
   },
   extraReducers: (builder) => {
@@ -180,6 +197,10 @@ const workspaceSlice = createSlice({
         state.members[payload.workspaceId] = (
           state.members[payload.workspaceId] ?? []
         ).filter((item) => item.userId !== payload.userId);
+      })
+      .addCase(setWorkspaceAi.fulfilled, (state, { payload }) => {
+        const workspace = state.items.find((item) => item.id === payload.id);
+        if (workspace) workspace.aiEnabled = payload.aiEnabled;
       })
       .addCase(renameWorkspace.fulfilled, (state, { payload }) => {
         const workspace = state.items.find((item) => item.id === payload.id);

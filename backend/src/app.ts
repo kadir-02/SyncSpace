@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import aiRoutes from "./routes/ai.routes.js";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
 import workspaceRoutes from "./routes/workspace.routes.js";
 import teamRoutes from "./routes/team.routes.js";
@@ -37,6 +38,7 @@ app.get("/api/v1/health", (_req, res) => {
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/ai", aiRoutes);
 app.use("/api/v1/workspaces", workspaceRoutes);
 app.use("/api/v1/workspaces", teamRoutes);
 app.use("/api/v1/teams", teamsRoutes);

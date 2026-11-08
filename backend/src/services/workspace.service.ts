@@ -80,6 +80,7 @@ export const createWorkspace = async (
     name: workspace.name,
     slug: workspace.slug,
     owner: workspace.owner,
+    aiEnabled: workspace.aiEnabled ?? false,
   };
 };
 
@@ -98,6 +99,7 @@ export const getUserWorkspaces = async (userId: string) => {
       name: workspace.name,
       slug: workspace.slug,
       role: membership.role,
+      aiEnabled: workspace.aiEnabled ?? false,
       createdAt: workspace.createdAt,
     };
   });
@@ -121,6 +123,7 @@ export const getWorkspaceById = async (workspaceId: string, userId: string) => {
     slug: workspace.slug,
     owner: workspace.owner,
     role: membership.role,
+    aiEnabled: workspace.aiEnabled ?? false,
     createdAt: workspace.createdAt,
     updatedAt: workspace.updatedAt,
   };
@@ -141,7 +144,7 @@ export const updateWorkspace = async (
   }
 
   if (membership.role !== "owner" && membership.role !== "admin") {
-    throw new AppError("Only workspace owners or admins can rename it", 403);
+    throw new AppError("Only workspace owners or admins can change settings", 403);
   }
 
   const workspace = await Workspace.findById(workspaceId);
@@ -151,13 +154,18 @@ export const updateWorkspace = async (
   }
 
   // The slug is left alone so existing links keep working.
-  workspace.name = data.name;
+  if (data.name !== undefined) workspace.name = data.name;
+  if (data.aiEnabled !== undefined) workspace.aiEnabled = data.aiEnabled;
   await workspace.save();
 
   try {
     getIO()
       .to(`workspace:${workspaceId}`)
-      .emit("workspace:updated", { id: workspaceId, name: workspace.name });
+      .emit("workspace:updated", {
+        id: workspaceId,
+        name: workspace.name,
+        aiEnabled: workspace.aiEnabled ?? false,
+      });
   } catch {
     // Socket server not initialised.
   }
@@ -166,6 +174,7 @@ export const updateWorkspace = async (
     id: workspace._id,
     name: workspace.name,
     slug: workspace.slug,
+    aiEnabled: workspace.aiEnabled ?? false,
   };
 };
 
