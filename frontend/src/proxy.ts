@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 // Optimistic auth gate. The real check happens client-side (GET /auth/me);
 // this only avoids flashing protected pages to signed-out visitors.
-const AUTH_PAGES = ["/login", "/register"];
+const AUTH_PAGES = ["/login", "/register", "/forgot-password", "/reset-password"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

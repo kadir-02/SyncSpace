@@ -3,6 +3,8 @@ import { User } from "../models/user.model.js";
 import { LoginInput, RegisterInput } from "../validations/auth.validation.js";
 import { AppError } from "../utils/app-error.js";
 import { generateAccessToken } from "../utils/jwt.js";
+import crypto from "crypto";
+import { sendPasswordResetEmail } from "../emails/reset-password.js";
 
 export const createUser = async ({ name, email, password }: RegisterInput) => {
   const existingUser = await User.findOne({ email });
@@ -56,4 +58,40 @@ export const loginUser = async ({ email, password }: LoginInput) => {
     },
     accessToken,
   };
+};
+
+export const forgotPassword = async (email: string) => {
+  const user = await User.findOne({
+    email: email.trim().toLowerCase(),
+  });
+
+  // Do not reveal whether an account exists.
+  if (!user) return;
+
+  const resetToken = crypto.randomBytes(32).toString("hex");
+
+  const tokenHash = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+
+  user.resetPasswordTokenHash = tokenHash;
+  user.resetPasswordExpiresAt = new Date(
+    Date.now() + 15 * 60 * 1000
+  );
+
+  await user.save();
+
+  const resetUrl =
+    `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
+
+  try {
+    await sendPasswordResetEmail(user.email, resetUrl);
+  } catch (error) {
+    user.resetPasswordTokenHash = undefined;
+    user.resetPasswordExpiresAt = undefined;
+    await user.save();
+
+    throw error;
+  }
 };
