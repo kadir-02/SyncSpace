@@ -16,6 +16,13 @@ interface UiState {
   socketConnected: boolean;
   // User whose profile card is open (null = closed).
   profileUserId: string | null;
+  quickActionsOpen: boolean;
+  paletteOpen: boolean;
+  shortcutsOpen: boolean;
+  // Hides the sidebar and quiet notifications so you can concentrate.
+  focusMode: boolean;
+  // Right-hand panel of the open channel (search or AI summary).
+  sidePanel: { type: "search" | "summary"; channelId: string } | null;
 }
 
 const initialState: UiState = {
@@ -24,6 +31,11 @@ const initialState: UiState = {
   activeChat: null,
   socketConnected: false,
   profileUserId: null,
+  quickActionsOpen: false,
+  paletteOpen: false,
+  shortcutsOpen: false,
+  focusMode: false,
+  sidePanel: null,
 };
 
 const uiSlice = createSlice({
@@ -48,6 +60,25 @@ const uiSlice = createSlice({
     activeChatSet(state, action: PayloadAction<ActiveChat>) {
       state.activeChat = action.payload;
     },
+    quickActionsToggled(state, action: PayloadAction<boolean | undefined>) {
+      state.quickActionsOpen = action.payload ?? !state.quickActionsOpen;
+    },
+    paletteToggled(state, action: PayloadAction<boolean | undefined>) {
+      state.paletteOpen = action.payload ?? !state.paletteOpen;
+      if (state.paletteOpen) state.quickActionsOpen = false;
+    },
+    shortcutsToggled(state, action: PayloadAction<boolean | undefined>) {
+      state.shortcutsOpen = action.payload ?? !state.shortcutsOpen;
+      if (state.shortcutsOpen) state.quickActionsOpen = false;
+    },
+    focusModeToggled(state, action: PayloadAction<boolean | undefined>) {
+      state.focusMode = action.payload ?? !state.focusMode;
+      state.quickActionsOpen = false;
+    },
+    sidePanelChanged(state, action: PayloadAction<UiState["sidePanel"]>) {
+      state.sidePanel = action.payload;
+      if (action.payload) state.quickActionsOpen = false;
+    },
     profileOpened(state, action: PayloadAction<string | null>) {
       state.profileUserId = action.payload;
     },
@@ -64,5 +95,10 @@ export const {
   activeChatSet,
   socketStatusChanged,
   profileOpened,
+  quickActionsToggled,
+  paletteToggled,
+  shortcutsToggled,
+  focusModeToggled,
+  sidePanelChanged,
 } = uiSlice.actions;
 export default uiSlice.reducer;

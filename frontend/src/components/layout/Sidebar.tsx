@@ -10,13 +10,16 @@ import {
   FilePlus2,
   Files,
   Hash,
+  LayoutDashboard,
   Lock,
   LogOut,
   Plus,
+  Settings,
   Users,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { CountBadge } from "@/components/ui/Badge";
+import { Logo } from "@/components/ui/Logo";
 import { CreateChannelModal } from "@/components/features/CreateChannelModal";
 import { CreateTeamModal } from "@/components/features/CreateTeamModal";
 import { NewDmModal } from "@/components/features/NewDmModal";
@@ -29,11 +32,16 @@ import { logout } from "@/store/slices/authSlice";
 import { selectUnreadActivityCount } from "@/store/selectors";
 import type { Team } from "@/types";
 
-const navLink = (active: boolean) =>
+// Outlined pill for the active item, soft hover for the rest.
+const pill = (active: boolean) =>
   cn(
-    "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors",
-    active ? "bg-indigo-500/20 text-white" : "text-slate-300 hover:bg-slate-800 hover:text-white",
+    "flex items-center gap-3 rounded-xl border px-3.5 py-2.5 text-sm font-medium transition-colors",
+    active
+      ? "border-white/20 bg-white/[0.06] text-violet-300 shadow-inner shadow-white/5"
+      : "border-transparent text-slate-300 hover:bg-white/5 hover:text-white",
   );
+
+const sectionLabel = "text-[11px] font-bold uppercase tracking-wider text-slate-500";
 
 function TeamSection({
   team,
@@ -52,12 +60,12 @@ function TeamSection({
   const unread = useAppSelector((state) => state.unread.channels);
 
   return (
-    <div className="mb-2">
+    <div className="mb-3">
       <div className="group flex items-center gap-1 px-1">
         <button
           type="button"
           onClick={() => setCollapsed((value) => !value)}
-          className="rounded p-1 text-slate-400 hover:text-white"
+          className="rounded p-1 text-slate-500 hover:text-white"
           aria-label={collapsed ? "Expand team" : "Collapse team"}
         >
           {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
@@ -65,8 +73,8 @@ function TeamSection({
         <Link
           href={`/w/${workspaceId}/teams/${team.id}`}
           className={cn(
-            "min-w-0 flex-1 truncate text-xs font-semibold uppercase tracking-wide hover:text-white",
-            pathname.endsWith(`/teams/${team.id}`) ? "text-white" : "text-slate-400",
+            "min-w-0 flex-1 truncate text-xs font-bold uppercase tracking-wide hover:text-white",
+            pathname.endsWith(`/teams/${team.id}`) ? "text-violet-300" : "text-slate-400",
           )}
         >
           {team.name}
@@ -85,15 +93,11 @@ function TeamSection({
       </div>
 
       {!collapsed && (
-        <ul className="mt-0.5 space-y-0.5">
+        <ul className="mt-1 space-y-0.5">
           {!team.isMember && (
-            <li className="px-3 py-1 text-xs italic text-slate-500">
-              Not a member — ask a lead to add you
-            </li>
+            <li className="px-3 py-1 text-xs italic text-slate-500">Not a member — ask a lead to add you</li>
           )}
-          {team.isMember && channels === undefined && (
-            <li className="px-3 py-1 text-xs text-slate-500">Loading…</li>
-          )}
+          {team.isMember && channels === undefined && <li className="px-3 py-1 text-xs text-slate-500">Loading…</li>}
           {team.isMember && channels?.length === 0 && (
             <li className="px-3 py-1 text-xs text-slate-500">No channels yet</li>
           )}
@@ -104,13 +108,13 @@ function TeamSection({
 
             return (
               <li key={channel.id}>
-                <Link href={href} className={navLink(active)}>
+                <Link href={href} className={cn(pill(active), "py-2")}>
                   {channel.type === "private" ? (
-                    <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <Lock className="h-3.5 w-3.5 shrink-0 opacity-70" />
                   ) : (
-                    <Hash className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <Hash className="h-3.5 w-3.5 shrink-0 opacity-70" />
                   )}
-                  <span className={cn("min-w-0 flex-1 truncate", count > 0 && !active && "font-semibold text-white")}>
+                  <span className={cn("min-w-0 flex-1 truncate", count > 0 && !active && "font-bold text-white")}>
                     {channel.name}
                   </span>
                   {!active && <CountBadge count={count} />}
@@ -141,30 +145,40 @@ export function Sidebar() {
   const base = `/w/${workspaceId}`;
 
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col bg-slate-900 text-slate-300">
-      <div className="border-b border-slate-800 p-2">
+    <aside className="bg-brand-dark flex h-full w-72 shrink-0 flex-col border-r border-white/5 text-slate-300">
+      <div className="border-b border-white/5 px-5 py-5">
+        <Link href={base} aria-label="COHVRA dashboard">
+          <Logo size={40} />
+        </Link>
+      </div>
+
+      <div className="px-3 pt-3">
         <WorkspaceSwitcher workspaceId={workspaceId} />
       </div>
 
-      <nav className="space-y-0.5 p-2" aria-label="Workspace">
-        <Link href={`${base}/notifications`} className={navLink(pathname === `${base}/notifications`)}>
-          <Bell className="h-4 w-4" />
-          <span className="flex-1">Activity</span>
+      <nav className="space-y-1 px-3 py-3" aria-label="Workspace">
+        <Link href={base} className={pill(pathname === base)}>
+          <LayoutDashboard className="h-[18px] w-[18px]" />
+          <span className="flex-1">Dashboard</span>
+        </Link>
+        <Link href={`${base}/notifications`} className={pill(pathname === `${base}/notifications`)}>
+          <Bell className="h-[18px] w-[18px]" />
+          <span className="flex-1">Notifications</span>
           <CountBadge count={activityCount} />
         </Link>
-        <Link href={`${base}/files`} className={navLink(pathname === `${base}/files`)}>
-          <Files className="h-4 w-4" />
+        <Link href={`${base}/files`} className={pill(pathname === `${base}/files`)}>
+          <Files className="h-[18px] w-[18px]" />
           <span className="flex-1">Files</span>
         </Link>
-        <Link href={`${base}/members`} className={navLink(pathname === `${base}/members`)}>
-          <Users className="h-4 w-4" />
+        <Link href={`${base}/members`} className={pill(pathname === `${base}/members`)}>
+          <Users className="h-[18px] w-[18px]" />
           <span className="flex-1">People</span>
         </Link>
       </nav>
 
-      <div className="scroll-slim-dark min-h-0 flex-1 overflow-y-auto px-2 pb-4">
-        <div className="mb-1 mt-2 flex items-center justify-between px-3">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Teams</span>
+      <div className="scroll-slim-dark min-h-0 flex-1 overflow-y-auto border-t border-white/5 px-3 pb-4 pt-3">
+        <div className="mb-2 flex items-center justify-between px-2">
+          <span className={sectionLabel}>Teams</span>
           {isAdmin && (
             <button
               type="button"
@@ -194,10 +208,8 @@ export function Sidebar() {
           />
         ))}
 
-        <div className="mb-1 mt-5 flex items-center justify-between px-3">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-            Direct messages
-          </span>
+        <div className="mb-2 mt-5 flex items-center justify-between px-2">
+          <span className={sectionLabel}>Messages</span>
           <button
             type="button"
             onClick={() => setDmModal(true)}
@@ -210,9 +222,7 @@ export function Sidebar() {
         </div>
 
         <ul className="space-y-0.5">
-          {conversations.length === 0 && (
-            <li className="px-3 py-1 text-xs text-slate-500">No conversations yet</li>
-          )}
+          {conversations.length === 0 && <li className="px-3 py-1 text-xs text-slate-500">No conversations yet</li>}
           {conversations.map((conversation) => {
             const other = otherParticipant(conversation, me?.id);
             const href = `${base}/dm/${conversation.id}`;
@@ -221,7 +231,7 @@ export function Sidebar() {
 
             return (
               <li key={conversation.id}>
-                <Link href={href} className={navLink(active)}>
+                <Link href={href} className={cn(pill(active), "py-2")}>
                   <Avatar
                     id={other?.id}
                     name={other?.name}
@@ -229,7 +239,7 @@ export function Sidebar() {
                     size="xs"
                     online={other ? Boolean(online[other.id]) : undefined}
                   />
-                  <span className={cn("min-w-0 flex-1 truncate", count > 0 && !active && "font-semibold text-white")}>
+                  <span className={cn("min-w-0 flex-1 truncate", count > 0 && !active && "font-bold text-white")}>
                     {other?.name ?? "Unknown"}
                   </span>
                   {!active && <CountBadge count={count} />}
@@ -240,30 +250,38 @@ export function Sidebar() {
         </ul>
       </div>
 
-      <div className="flex items-center gap-3 border-t border-slate-800 p-3">
+      <div className="border-t border-white/5 p-3">
         <Link
           href={`${base}/profile`}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 -m-1 hover:bg-slate-800"
+          className="mb-3 flex items-center gap-3 rounded-xl p-2 hover:bg-white/5"
           title="Your profile"
         >
-          <Avatar id={me?.id} name={me?.name} src={me?.avatar} size="md" online />
+          <Avatar id={me?.id} name={me?.name} src={me?.avatar} size="lg" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-white">{me?.name}</p>
-            <p className="truncate text-xs text-slate-400">View profile</p>
+            <p className="truncate text-sm font-bold text-white">{me?.name}</p>
+            <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-400">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" /> Online
+            </p>
           </div>
         </Link>
-        <button
-          type="button"
-          onClick={() => {
-            dispatch(logout());
-            router.replace("/login");
-          }}
-          className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
-          aria-label="Sign out"
-          title="Sign out"
-        >
-          <LogOut className="h-4 w-4" />
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <Link
+            href={`${base}/profile`}
+            className="flex items-center justify-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 text-sm font-medium text-slate-200 hover:bg-white/5"
+          >
+            <Settings className="h-4 w-4" /> Settings
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              dispatch(logout());
+              router.replace("/login");
+            }}
+            className="flex items-center justify-center gap-2 rounded-xl border border-white/15 px-3 py-2.5 text-sm font-medium text-slate-200 hover:bg-white/5"
+          >
+            <LogOut className="h-4 w-4" /> Logout
+          </button>
+        </div>
       </div>
 
       <CreateTeamModal open={teamModal} workspaceId={workspaceId} onClose={() => setTeamModal(false)} />

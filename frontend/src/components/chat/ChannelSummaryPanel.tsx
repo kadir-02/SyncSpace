@@ -187,7 +187,7 @@ export function ChannelSummaryPanel({
     <aside className="flex h-full w-full flex-col border-l border-slate-200 bg-slate-50 sm:w-96">
       <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-          <Sparkles className="h-4 w-4 text-indigo-600" /> AI channel summary
+          <Sparkles className="h-4 w-4 text-violet-600" /> AI channel summary
         </h2>
         <button
           type="button"
@@ -289,7 +289,7 @@ export function ChannelSummaryPanel({
                 </div>
 
                 {result.summary.overview && (
-                  <p className="rounded-xl bg-indigo-50 p-3 text-sm leading-relaxed text-indigo-950">
+                  <p className="rounded-xl bg-violet-50 p-3 text-sm leading-relaxed text-violet-950">
                     {result.summary.overview}
                   </p>
                 )}
@@ -297,7 +297,7 @@ export function ChannelSummaryPanel({
                 <Section
                   icon={<MessageSquareText className="h-3.5 w-3.5" />}
                   title="Important discussions"
-                  tone="bg-indigo-100 text-indigo-600"
+                  tone="bg-violet-100 text-violet-600"
                   empty={result.summary.discussions.length === 0}
                 >
                   <ul className="space-y-3">

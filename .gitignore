@@ -60,3 +60,6 @@ uploads/
 *.db
 *.sqlite
 *.sqlite3
+
+
+cohvra/

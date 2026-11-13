@@ -123,12 +123,12 @@ export default function ProfilePage() {
     <div className="scroll-slim h-full overflow-y-auto">
       <div className="mx-auto max-w-2xl space-y-6 px-5 py-8">
         <header>
-          <h1 className="text-2xl font-semibold text-slate-900">Your profile</h1>
+          <h1 className="text-3xl font-bold text-violet-700 lg:text-4xl">Your profile</h1>
           <p className="mt-1 text-sm text-slate-500">How you appear to everyone in your workspaces.</p>
         </header>
 
-        <section className="rounded-xl border border-slate-200 p-5">
-          <h2 className="mb-4 text-sm font-semibold text-slate-900">Photo</h2>
+        <section className="rounded-2xl border border-slate-200/70 bg-white shadow-sm p-5">
+          <h2 className="mb-4 text-sm font-bold text-slate-900">Photo</h2>
           <div className="flex flex-wrap items-center gap-5">
             <Avatar id={me.id} name={me.name} src={me.avatar} size="xl" />
             <div className="space-y-2">
@@ -164,8 +164,8 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        <form onSubmit={onSaveName} className="space-y-4 rounded-xl border border-slate-200 p-5">
-          <h2 className="text-sm font-semibold text-slate-900">Details</h2>
+        <form onSubmit={onSaveName} className="space-y-4 rounded-2xl border border-slate-200/70 bg-white shadow-sm p-5">
+          <h2 className="text-sm font-bold text-slate-900">Details</h2>
           <Field label="Full name">
             <Input required minLength={2} maxLength={50} value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
@@ -179,8 +179,8 @@ export default function ProfilePage() {
           </div>
         </form>
 
-        <form onSubmit={onChangePassword} className="space-y-4 rounded-xl border border-slate-200 p-5">
-          <h2 className="text-sm font-semibold text-slate-900">Password</h2>
+        <form onSubmit={onChangePassword} className="space-y-4 rounded-2xl border border-slate-200/70 bg-white shadow-sm p-5">
+          <h2 className="text-sm font-bold text-slate-900">Password</h2>
           {passwordError && (
             <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">
               {passwordError}

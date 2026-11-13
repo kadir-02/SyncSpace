@@ -19,7 +19,7 @@ import {
   markChannelRead,
   sendMessage,
 } from "@/store/slices/messageSlice";
-import { activeChatSet, toastAdded } from "@/store/slices/uiSlice";
+import { activeChatSet, sidePanelChanged, toastAdded } from "@/store/slices/uiSlice";
 import { ChannelSettingsModal } from "./ChannelSettingsModal";
 import { ChannelSummaryPanel } from "./ChannelSummaryPanel";
 import { Composer } from "./Composer";
@@ -44,10 +44,12 @@ export function ChannelView({ channelId }: { channelId: string }) {
     );
   });
 
-  // Side panel (search or AI summary), remembered with its channel so it closes on navigation.
-  const [panel, setPanel] = useState<{ type: "search" | "summary"; channelId: string } | null>(null);
-  const searchOpen = panel?.type === "search" && panel.channelId === channelId;
-  const summaryOpen = panel?.type === "summary" && panel.channelId === channelId;
+  // Side panel (search or AI summary) is Redux state so Quick Actions can open it.
+  const sidePanel = useAppSelector((state) => state.ui.sidePanel);
+  const searchOpen = sidePanel?.type === "search" && sidePanel.channelId === channelId;
+  const summaryOpen = sidePanel?.type === "summary" && sidePanel.channelId === channelId;
+  const setPanel = (panel: { type: "search" | "summary"; channelId: string } | null) =>
+    dispatch(sidePanelChanged(panel));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const markedIds = useRef<Set<string>>(new Set());
 
@@ -58,6 +60,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
 
     return () => {
       dispatch(activeChatSet(null));
+      dispatch(sidePanelChanged(null));
     };
   }, [channelId, dispatch]);
 
@@ -144,7 +147,7 @@ export function ChannelView({ channelId }: { channelId: string }) {
             aria-label="AI summary"
             title="AI summary"
           >
-            <Sparkles className="h-4 w-4 text-indigo-600" />
+            <Sparkles className="h-4 w-4 text-violet-600" />
           </Button>
           <Button
             variant={searchOpen ? "secondary" : "ghost"}

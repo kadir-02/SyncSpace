@@ -72,7 +72,7 @@ export function UserProfileModal() {
           <h3 className="mt-4 text-lg font-semibold text-slate-900">
             {profile.name} {isMe && <span className="text-sm font-normal text-slate-400">(you)</span>}
           </h3>
-          <a href={`mailto:${profile.email}`} className="text-sm text-indigo-600 hover:underline">
+          <a href={`mailto:${profile.email}`} className="text-sm text-violet-600 hover:underline">
             {profile.email}
           </a>
 

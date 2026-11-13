@@ -111,7 +111,7 @@ export function CreateChannelModal({
                 className={cn(
                   "flex items-start gap-2 rounded-lg border p-3 text-left transition-colors",
                   type === option.value
-                    ? "border-indigo-500 bg-indigo-50"
+                    ? "border-violet-500 bg-violet-50"
                     : "border-slate-200 hover:bg-slate-50",
                 )}
               >

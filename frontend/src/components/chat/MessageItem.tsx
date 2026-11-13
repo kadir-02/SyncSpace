@@ -52,7 +52,7 @@ function AttachmentView({ attachment }: { attachment: Attachment }) {
       rel="noopener noreferrer"
       className="flex w-fit max-w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 hover:bg-slate-50"
     >
-      <FileText className="h-5 w-5 shrink-0 text-indigo-500" />
+      <FileText className="h-5 w-5 shrink-0 text-violet-500" />
       <span className="min-w-0">
         <span className="block truncate text-sm font-medium text-slate-800">
           {attachment.originalName}

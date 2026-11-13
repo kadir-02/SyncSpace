@@ -22,11 +22,11 @@ export function Avatar({ name, src, id, size = "md", online, className }: Avatar
     <span className={cn("relative inline-flex shrink-0", className)}>
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={name ?? "avatar"} className={cn("rounded-lg object-cover", SIZES[size])} />
+        <img src={src} alt={name ?? "avatar"} className={cn("rounded-full object-cover", SIZES[size])} />
       ) : (
         <span
           className={cn(
-            "inline-flex items-center justify-center rounded-lg font-semibold text-white",
+            "inline-flex items-center justify-center rounded-full font-semibold text-white",
             SIZES[size],
             avatarColor(id ?? name ?? "user"),
           )}

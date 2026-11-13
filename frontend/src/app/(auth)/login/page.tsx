@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Field";
 import { useAppDispatch } from "@/store/hooks";
 import { login } from "@/store/slices/authSlice";
-import { LucideEye, LucideEyeClosed } from "lucide-react";
 
 export default function LoginPage() {
   const dispatch = useAppDispatch();
@@ -16,7 +15,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [passtype, setPasstype] = useState(false);
 
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -25,7 +23,7 @@ export default function LoginPage() {
 
     try {
       await dispatch(login({ email: email.trim(), password })).unwrap();
-      router.replace("/");
+      router.replace("/app");
     } catch (message) {
       setError(typeof message === "string" ? message : "Login failed");
       setLoading(false);
@@ -35,7 +33,7 @@ export default function LoginPage() {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
-        <h1 className="text-lg font-semibold text-slate-900">Welcome back</h1>
+        <h1 className="text-xl font-bold text-violet-800">Welcome back</h1>
         <p className="mt-1 text-sm text-slate-500">
           Sign in to continue to your workspace.
         </p>
@@ -62,42 +60,35 @@ export default function LoginPage() {
       </Field>
 
       <Field label="Password">
-        <div className="w-full relative ">
-          <Input
-            type={passtype ? "text" : "password"}
-            autoComplete="current-password"
-            required
-            minLength={6}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="••••••••"
-          />
-          <button
-            type="button"
-            onClick={() => setPasstype((prev) => !prev)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
-          >
-            {passtype ? <LucideEyeClosed /> : <LucideEye />}
-          </button>
-        </div>
+        <Input
+          type="password"
+          autoComplete="current-password"
+          required
+          minLength={6}
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          placeholder="••••••••"
+        />
       </Field>
+
       <div className="flex justify-end -mt-1">
         <Link
           href="/forgot-password"
-          className="text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:underline transition-colors"
+          className="text-sm font-medium text-violet-600  hover:underline transition-colors"
         >
           Forgot password?
         </Link>
       </div>
+
       <Button type="submit" loading={loading} className="w-full">
         Sign in
       </Button>
 
       <p className="text-center text-sm text-slate-500">
-        New to SyncSpace?{" "}
+        New to COHVRA?{" "}
         <Link
           href="/register"
-          className="font-medium text-indigo-600 hover:underline"
+          className="font-medium text-violet-600 hover:underline"
         >
           Create an account
         </Link>

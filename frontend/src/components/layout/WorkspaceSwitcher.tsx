@@ -28,11 +28,11 @@ export function WorkspaceSwitcher({ workspaceId }: { workspaceId: string }) {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-slate-800"
+        className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-left transition-colors hover:bg-white/10"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500 text-xs font-bold text-white">
+        <span className="bg-brand-gradient flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white">
           {initials(current?.name)}
         </span>
         <span className="min-w-0 flex-1">
@@ -61,7 +61,7 @@ export function WorkspaceSwitcher({ workspaceId }: { workspaceId: string }) {
                     {initials(workspace.name)}
                   </span>
                   <span className="flex-1 truncate">{workspace.name}</span>
-                  {workspace.id === workspaceId && <Check className="h-4 w-4 text-indigo-600" />}
+                  {workspace.id === workspaceId && <Check className="h-4 w-4 text-violet-600" />}
                 </Link>
               </li>
             ))}

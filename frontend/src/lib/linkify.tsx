@@ -11,7 +11,7 @@ export function linkify(text: string): ReactNode[] {
         href={part}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-indigo-600 underline decoration-indigo-300 hover:decoration-indigo-600"
+        className="text-violet-600 underline decoration-violet-300 hover:decoration-violet-600"
       >
         {part}
       </a>

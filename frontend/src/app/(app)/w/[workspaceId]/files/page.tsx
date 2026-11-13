@@ -79,7 +79,7 @@ export default function FilesPage() {
       <div className="mx-auto max-w-5xl space-y-6 px-5 py-8">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900">Files</h1>
+            <h1 className="text-3xl font-bold text-violet-700 lg:text-4xl">Files</h1>
             <p className="mt-1 text-sm text-slate-500">
               Shared files you have access to. Max 10 MB each.
             </p>
@@ -115,7 +115,7 @@ export default function FilesPage() {
           <>
             <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {entry.items.map((file) => (
-                <li key={file.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <li key={file.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                   <a
                     href={file.url}
                     target="_blank"

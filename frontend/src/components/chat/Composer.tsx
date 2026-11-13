@@ -151,11 +151,11 @@ export function Composer({
   };
 
   return (
-    <div className="px-5 pb-4">
+    <div className="pb-4 pl-5 pr-20">
       <div
         className={cn(
           "rounded-xl border border-slate-300 bg-white shadow-sm transition-colors",
-          "focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20",
+          "focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-500/20",
         )}
       >
         {(pending.length > 0 || uploading) && (

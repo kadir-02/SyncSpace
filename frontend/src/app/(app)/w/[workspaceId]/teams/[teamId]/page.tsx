@@ -138,7 +138,7 @@ export default function TeamPage() {
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="truncate text-2xl font-semibold text-slate-900">{team.name}</h1>
+              <h1 className="truncate text-3xl font-bold text-violet-700 lg:text-4xl">{team.name}</h1>
               {team.myRole && <Badge tone="indigo">{team.myRole}</Badge>}
             </div>
             <p className="mt-1 text-sm text-slate-500">{team.description || "No description yet."}</p>
@@ -159,7 +159,7 @@ export default function TeamPage() {
 
         <section>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">Channels</h2>
+            <h2 className="text-sm font-bold text-slate-900">Channels</h2>
             {isAdmin && team.isMember && (
               <Button size="sm" variant="secondary" onClick={() => setChannelModal(true)}>
                 <Plus className="h-4 w-4" /> New channel
@@ -177,7 +177,7 @@ export default function TeamPage() {
               No channels yet.
             </p>
           ) : (
-            <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+            <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200/70 bg-white shadow-sm">
               {channels.map((channel) => (
                 <li key={channel.id}>
                   <Link
@@ -203,7 +203,7 @@ export default function TeamPage() {
         </section>
 
         <section>
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">
+          <h2 className="mb-3 text-sm font-bold text-slate-900">
             Members {members && <span className="font-normal text-slate-400">({members.length})</span>}
           </h2>
 
@@ -255,7 +255,7 @@ export default function TeamPage() {
               </div>
             )
           ) : (
-            <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+            <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200/70 bg-white shadow-sm">
               {members.map((member) => {
                 const isMe = member.userId === me?.id;
 

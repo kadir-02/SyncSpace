@@ -3,9 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MessagesSquare } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Field";
+import { LogoMark } from "@/components/ui/Logo";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { createWorkspace } from "@/store/slices/workspaceSlice";
 import { logout } from "@/store/slices/authSlice";
@@ -34,12 +34,10 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center bg-slate-50 px-4 py-10">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-white">
-          <MessagesSquare className="h-5 w-5" />
-        </span>
-        <h1 className="mt-4 text-xl font-semibold text-slate-900">Create a workspace</h1>
+    <div className="bg-brand-dark flex min-h-full flex-col items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl shadow-black/30 sm:p-8">
+        <LogoMark size={48} />
+        <h1 className="mt-4 text-xl font-bold text-violet-800">Create a workspace</h1>
         <p className="mt-1 text-sm text-slate-500">
           A workspace is where your company or group chats. You can add teams and channels next.
         </p>
@@ -86,7 +84,7 @@ export default function OnboardingPage() {
 
         <div className="mt-6 flex items-center justify-between text-sm">
           {hasWorkspaces ? (
-            <Link href="/" className="text-indigo-600 hover:underline">
+            <Link href="/app" className="text-violet-600 hover:underline">
               ← Back to workspace
             </Link>
           ) : (

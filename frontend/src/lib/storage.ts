@@ -1,5 +1,5 @@
-const TOKEN_KEY = "ss_token";
-const LAST_WORKSPACE_KEY = "ss_last_workspace";
+const TOKEN_KEY = "cohvra_token";
+const LAST_WORKSPACE_KEY = "cohvra_last_workspace";
 const ONE_DAY = 60 * 60 * 24;
 
 const canUseStorage = () => typeof window !== "undefined";

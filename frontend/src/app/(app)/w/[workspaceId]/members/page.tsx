@@ -137,7 +137,7 @@ function AddMemberModal({
 
         {!searching && visibleResults.length === 0 && query.trim().length >= 3 && !error && (
           <p className="py-4 text-center text-sm text-slate-500">
-            No registered users match. They need to create a SyncSpace account first.
+            No registered users match. They need to create a COHVRA account first.
           </p>
         )}
 
@@ -304,7 +304,7 @@ export default function MembersPage() {
       <div className="mx-auto max-w-3xl space-y-8 px-5 py-8">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900">People</h1>
+            <h1 className="text-3xl font-bold text-violet-700 lg:text-4xl">People</h1>
             <p className="mt-1 text-sm text-slate-500">
               {members.length} member{members.length === 1 ? "" : "s"} in {workspace?.name}
             </p>
@@ -321,7 +321,7 @@ export default function MembersPage() {
             <Spinner />
           </div>
         ) : (
-          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+          <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200/70 bg-white shadow-sm">
             {members.map((member) => {
               const isMe = member.userId === me?.id;
 
@@ -414,8 +414,8 @@ export default function MembersPage() {
           </ul>
         )}
 
-        <section className="space-y-3 rounded-xl border border-slate-200 p-5">
-          <h2 className="text-sm font-semibold text-slate-900">Workspace</h2>
+        <section className="space-y-3 rounded-2xl border border-slate-200/70 bg-white shadow-sm p-5">
+          <h2 className="text-sm font-bold text-slate-900">Workspace</h2>
           {isAdmin && (
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm text-slate-600">
@@ -456,7 +456,7 @@ export default function MembersPage() {
                 onClick={() => toggleAi(!workspace?.aiEnabled)}
                 className={cn(
                   "relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60",
-                  workspace?.aiEnabled ? "bg-indigo-600" : "bg-slate-300",
+                  workspace?.aiEnabled ? "bg-violet-600" : "bg-slate-300",
                 )}
               >
                 <span

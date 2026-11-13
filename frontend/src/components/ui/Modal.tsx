@@ -50,13 +50,13 @@ export function Modal({
     >
       <div
         className={cn(
-          "flex max-h-[90vh] w-full flex-col rounded-t-2xl bg-white shadow-xl sm:rounded-2xl",
+          "flex max-h-[90vh] w-full flex-col rounded-t-3xl bg-white shadow-xl sm:rounded-3xl",
           WIDTHS[size],
         )}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+            <h2 className="text-base font-bold text-slate-900">{title}</h2>
             {description && <p className="mt-0.5 text-sm text-slate-500">{description}</p>}
           </div>
           <button

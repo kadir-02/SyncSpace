@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 
 const TONES = {
   slate: "bg-slate-100 text-slate-600",
-  indigo: "bg-indigo-100 text-indigo-700",
+  indigo: "bg-violet-100 text-violet-700",
   emerald: "bg-emerald-100 text-emerald-700",
   amber: "bg-amber-100 text-amber-700",
 };

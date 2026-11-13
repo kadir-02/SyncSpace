@@ -8,7 +8,7 @@ import { toastDismissed, type Toast } from "@/store/slices/uiSlice";
 import { cn } from "@/lib/utils";
 
 const ICONS = {
-  info: <Bell className="h-4 w-4 text-indigo-500" />,
+  info: <Bell className="h-4 w-4 text-violet-500" />,
   success: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
   error: <AlertCircle className="h-4 w-4 text-rose-500" />,
 };
@@ -62,10 +62,13 @@ function ToastItem({ toast }: { toast: Toast }) {
 }
 
 export function Toaster() {
-  const toasts = useAppSelector((state) => state.ui.toasts);
+  const allToasts = useAppSelector((state) => state.ui.toasts);
+  const focusMode = useAppSelector((state) => state.ui.focusMode);
+  // Focus mode only silences informational pop-ups; errors and confirmations still show.
+  const toasts = focusMode ? allToasts.filter((toast) => toast.kind !== "info") : allToasts;
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-[60] flex flex-col gap-2">
+    <div className="pointer-events-none fixed bottom-24 right-4 z-60 flex flex-col gap-2 sm:right-6">
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} />
       ))}
